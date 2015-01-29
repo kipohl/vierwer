@@ -2,9 +2,9 @@
 # A really quick image viewer (Slicer needs to be build in release build otherwise too slow 
 
 SLICERSUPER=/software/Slicer4/releasebuild
-
-CMD="${SLICERSUPER}/Slicer-build/Slicer --disable-scripted-loadable-modules --no-main-window --disable-cli-modules"
-
+# --no-main-window
+CMD="${SLICERSUPER}/Slicer-build/Slicer --no-splash --disable-scripted-loadable-modules  --disable-cli-modules"
+# CMD="$CMD --no-main-window"
 if [ "$1" == "-i" ]; then 
   CMD="$CMD --show-python-interactor"
   shift

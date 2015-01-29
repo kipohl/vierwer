@@ -1,233 +1,528 @@
 import argparse
-import slite
-import readFile
+import os 
+import vtk.util.numpy_support
+import numpy
+import nibabel as nib
 
+import CompareVolumes
+import slite
 #
 # Functions
 #
-def CreateVolumeScalarNode(referenceNode, nodeName):
-  clonedVolumeNode=slicer.vtkMRMLScalarVolumeNode()
-  clonedVolumeNode.CopyWithScene(referenceNode)
-  clonedVolumeNode.SetAndObserveStorageNodeID("")
-  clonedVolumeNode.SetName(nodeName);
 
-  clonedDisplayNode=slicer.vtkMRMLScalarVolumeDisplayNode()
-  clonedDisplayNode.CopyWithScene(referenceNode.GetDisplayNode())
-  slicer.mrmlScene.AddNode(clonedDisplayNode)
-  clonedVolumeNode.SetAndObserveDisplayNodeID(clonedDisplayNode.GetID())
+def ReadImageSlicer(FileName): 
+  mrml = slicer.vtkMRMLScene()
+  vl = slicer.vtkSlicerVolumesLogic()
+  vl.SetAndObserveMRMLScene(mrml)
+  n = vl.AddArchetypeVolume(FileName,'CTC')
+  i = n.GetImageData()
+  return i
 
-  #VTK_CREATE(vtkImageData, volumeData);
-  #clonedVolumeNode->SetAndObserveImageData(volumeData);
+# Implementation based on https://github.com/pieper/CaseHub/blob/5aaeb51d4b7281b39f116b180123227331ce791a/BenchtopNeuro/BenchtopNeuro.py#L306-L348
+# interesting to look at 
+# https://github.com/loli/medpy/blob/master/medpy/io/load.py
+# no flipping needed - checked it 
+# reads in image data from second frame (as we assume 1st frame is already read)
 
-  slicer.mrmlScene.AddNode(clonedVolumeNode)
+def nibVtkConversionDirect(loadedFile,scalarType):
+    # startT=time.time()
+    py4DImg=loadedFile.get_data()
 
-  volID = clonedVolumeNode.GetID()
-  return slicer.mrmlScene.GetNodeByID(volID)
+    tDim=py4DImg.shape[3]
+    shape3D=py4DImg.shape[0:3]
+    # same as dim=vNode.GetImageData().GetDimensions()
+    sDim=shape3D[2]
+    yDim=shape3D[1]
+    xDim=shape3D[0]
 
-def createRowVolumes(fileList,rowName,labelFlag,fourDFlag):
+    imgList=[]
+    for index in  xrange(1,tDim): 
+      vtkImg=vtk.vtkImageData()
+      vtkImg.SetDimensions(shape3D)
+      vtkImg.AllocateScalars(scalarType,1)
+      
+      # Maybe this is a better way 
+      # import SimpleITK as sitk    
+      # img=sitk.GetImageFromArray(py4DImg[:,:,:,index])
 
-  if not fileList: 
-    return ("","")
+      # problem with orientation so currently 
+      vtkImgArray = vtk.util.numpy_support.vtk_to_numpy(vtkImg.GetPointData().GetScalars()).reshape(shape3D[2],shape3D[0],shape3D[1])
+      #http://nipy.org/nibabel/coordinate_systems.html
+      # Problem - different coordinate system between nibabel and vkt 
+      for slice in xrange(sDim):
+         vtkImgArray[slice,:,:] = py4DImg[:,:,slice,index].T
+          # py3DImg = numpy.fliplr(py4DImg[:,:,slice,index])
 
-  if not fourDFlag:
-    fileList=[item for sublist in fileList for item in sublist]
+      # This does not work as 
+      # Still Slow 
+      # http://www.vtk.org/Wiki/VTK/Examples/Cxx/ImageData/IterateImageData                       
+      #for slice in xrange(0,sDim):
+      #  for y in xrange(0,yDim):
+      #    for x in xrange(0,xDim):
+      #      ptr= vtk.util.numpy_support.vtk_to_numpy(vtkImg.GetScalarPointer(x,y,slice))
+      #      print ptr
+      #      ptr[0]=py4DImg[x,y,slice,index]
 
-  rowScalarType=-1
-  volNode=[]
-  imgList=[] 
-  volScalarType=[]
-  numVolumes=len(fileList)
+      imgList.append(vtkImg)
+  
+    # endT=time.time()
+    # print "Took: %f" % (endT - startT) 
+    return imgList
 
-  for index in xrange(numVolumes):
-    firstFileName=fileList[index]
-    if not isinstance(firstFileName, basestring) :
-        firstFileName=firstFileName[0]
+def load4DVolume(listFileNames,labelFlag):
+
+    # Needs to be done that way to work for single file name and multi one 
+    firstFileName=listFileNames 
+    if isinstance(firstFileName, basestring) :
+      multiFileFlag=False
+    else :
+      firstFileName=listFileNames[0]
+      if len(listFileNames) > 1:
+        multiFileFlag=True
+      else: 
+        multiFileFlag=False
+
+    # Load first volume
+    vNode = slite.loadVolume(firstFileName,labelFlag)
+    if not vNode: 
+      slite.errorPrint(0,"Could not load %s!", firstFileName)  
+
+    iVtkList=[vNode.GetImageData()]
+    #
+    # Load Multi File Volume 
+    #
+    if multiFileFlag:   
+       for FILE in listFileNames[1:] :
+         img=ReadImageSlicer(FILE)
+         if img:
+           iVtkList.append(img)
+
+       return (vNode,iVtkList)
+
+    #
+    # Load Single File Volume 
+    #
+    fileExt=os.path.splitext(firstFileName)[1]
+    if fileExt == ".gz" :
+       fileExt=os.path.splitext(firstFileName)[1]
+
+    # nibabel 1.3 cannot read nrrd file - so assume it is 3D right now 
+    if fileExt == ".nrrd": 
+        print "Warning: NRRD files are assumed to be 3D"
+        return (vNode,iVtkList)
     
-    volNode.append(slite.loadVolume(firstFileName,labelFlag))
+    loadedFile=nib.load(firstFileName)
+    # Nothing to do as it is a 3D Volume - so already read by slicer function
+    if len(loadedFile.shape) == 3 :
+        return (vNode,iVtkList)
 
-    if fourDFlag :
-       iList=[]
-       for FILE in fileList[index]: 
-         iList.append(readFile.ReadImageSlicer(FILE))
+    # Sadly enough this was the best solution I found so far - write to file and read in again 
+    # imgList=nibVtkConversionWrite(loadedFile)
+    imgList=nibVtkConversionDirect(loadedFile,vNode.GetImageData().GetScalarType())
+    iVtkList.extend(imgList)
 
-       imgList.append(iList)
-    else:
-       imgList.append([volNode[index].GetImageData()])
+    return (vNode,iVtkList)
 
-    volScalarType.append(volNode[index].GetImageData().GetScalarType())
-    if volScalarType[index] > rowScalarType :
-      rowScalarType=volScalarType[index]
+def loadVolumes(fileList,labelFlag,fourDFlag):
+
+   imgList=[]    
+   volNodeList=[]
+
+   if not fileList: 
+     return (volNodeList,imgList)
+   
+   if not fourDFlag:
+     fileList=[item for sublist in fileList for item in sublist]
+
+   numVolumes=len(fileList)
+
+   # For multiple input   
+   for index in xrange(numVolumes):
+     (volNode,iList) = load4DVolume(fileList[index],labelFlag)
+   
+     volNodeList.append(volNode)    
+     imgList.append(iList)
+   
+   return (volNodeList,imgList)
+
+class CtrlPanelWidget:
+  def __init__(self,sliceNodes,fgNodeList,fgNodeImgList,bgNodeList,bgNodeImgList,lmNodeList,lmNodeImgList):
+    self.sliceNodeList = sliceNodes   
+    self.nodeType = ('FG', 'BG', 'LM')
+    self.nodeList=[fgNodeList,bgNodeList,lmNodeList]
+    self.nodeImgList=[fgNodeImgList,bgNodeImgList,lmNodeImgList]
+    self.ctrlWidget = ""
+    self.selectedOrientation = ""
+    self.layoutManager = slicer.app.layoutManager()
+    self.numFrames = len(fgNodeImgList[0])
+    self.orientations = ('Axial', 'Sagittal', 'Coronal')
+    self.LinkViewers()
+
+  def CreateCtrlPanel(self,wName,parent):
+    if self.ctrlWidget : 
+      return
+
+    if parent:
+       self.ctrlWidget=parent
+    else :  
+       self.ctrlWidget=slicer.qMRMLWidget()
+       self.ctrlWidget.setMRMLScene(slicer.mrmlScene)
+       self.ctrlWidget.setLayout(qt.QGridLayout())
+       
+
+    self.ctrlWidget.setWindowTitle(wName) 
+    ctrlLayout = self.ctrlWidget.layout()  
+
+    if self.numFrames > 1:  
+      ctrlFrameLabel = qt.QLabel('Frame')
+      ctrlFrameSlider = ctk.ctkSliderWidget()
+      ctrlFrameSlider.minimum=0 
+      ctrlFrameSlider.maximum=self.numFrames-1
+      ctrlFrameSlider.connect('valueChanged(double)', self.onSliderFrameChanged)
+      ctrlLayout.addWidget(ctrlFrameLabel, 0, 0)
+      ctrlLayout.addWidget(ctrlFrameSlider, 0, 1)
 
 
-  if numVolumes == 1: 
-    return (volNode[0],imgList)
+    ctrlLevelLabel = qt.QLabel('Level')
+    ctrlLevelSlider = ctk.ctkSliderWidget()
 
-  #
-  # Set them all to the same scalar type and attach to row
-  #
-  rowView=vtk.vtkImageAppend()
-  rowView.SetAppendAxis(2)
+    ctrlWindowLabel = qt.QLabel('Window')
+    ctrlWindowSlider = ctk.ctkSliderWidget()
 
-  for index in xrange(numVolumes) :
-    if volScalarType[index] != rowScalarType :
-      volCorrected = vtk.vtkImageCast()
-      volCorrected.SetInputConnection(volNode[index].GetImageDataConnection()) 
-      volCorrected.SetOutputScalarType(rowScalarType)
-      volCorrected.Update()
-      volNode[index].SetImageDataConnection(volCorrected.GetOutputPort())
-
-  for index in reversed(xrange(numVolumes)) :
-    rowView.AddInputData(volNode[index].GetImageData())
-
-  rowView.Update()
-  # create a volume node 
-
-  rowNode=CreateVolumeScalarNode(volNode[0],rowName) 
-  rowNode.SetImageDataConnection(rowView.GetOutputPort())
+    vImg = self.nodeImgList[0][0][0]
+    vNode = self.nodeList[0][0]
+    if vImg and vNode: 
+      iRange=vImg.GetScalarRange()
+      ctrlLevelSlider.minimum = iRange[0]
+      ctrlWindowSlider.minimum = iRange[0]
+      ctrlLevelSlider.maximum = iRange[1]
+      ctrlWindowSlider.maximum = iRange[1]*1.2
+      ctrlLevelSlider.value=vNode.GetVolumeDisplayNode().GetLevel()
+      ctrlWindowSlider.value=vNode.GetVolumeDisplayNode().GetWindow()
   
-  rowOrigin=rowNode.GetOrigin()
+    ctrlLevelSlider.connect('valueChanged(double)', self.onSliderLevelChanged)
+    ctrlWindowSlider.connect('valueChanged(double)', self.onSliderWindowChanged)
 
-  rowNode.SetOrigin(numVolumes*rowOrigin[0],rowOrigin[1],rowOrigin[2])
+    ctrlLayout.addWidget(ctrlLevelLabel, 1, 0)
+    ctrlLayout.addWidget(ctrlLevelSlider, 1, 1)
+    ctrlLayout.addWidget(ctrlWindowLabel, 2, 0)
+    ctrlLayout.addWidget(ctrlWindowSlider, 2, 1)
 
-  return (rowNode,imgList) 
+    #self.orientationBox = qt.QGroupBox("Orientation")
+    #self.orientationBox.setLayout(qt.QFormLayout())
+    self.orientationButtons = {}
+    index=0
+    for orientation in self.orientations:
+      self.orientationButtons[orientation] = qt.QRadioButton()
+      self.orientationButtons[orientation].text = orientation
+      # self.orientationBox.layout().addWidget(self.orientationButtons[orientation])
+      ctrlLayout.addWidget(self.orientationButtons[orientation],3,index)
+      self.orientationButtons[orientation].connect("clicked()",lambda o=orientation: self.setOrientation(o))
+      index+=1
 
+    # parametersFormLayout.addWidget(self.orientationBox)
+    self.setOrientation(self.orientations[0])
 
-def getViewerVolumeNode(win,vType):
-  sComp=win.sliceLogic().GetSliceCompositeNode() 
-  nID=""
-  if vType == "fg": 
-     nID=sComp.GetForegroundVolumeID()
-  elif vType == "bg": 
-     nID=sComp.GetBackgroundVolumeID()
-  elif vType == "lm":
-     nID=sComp.GetLabelVolumeID()
-
-  if nID:  
-    return slicer.mrmlScene.GetNodeByID(nID)
-  
-  return "" 
-
-def getActiveVolumeNode(win):
-  sNode=getViewerVolumeNode(win,"fg")
-  if not sNode: 
-    sNode=getViewerVolumeNode(win,"bg")
-  elif not sNode: 
-    sNode=getViewerVolumeNode(win,"lm")
-  elif not sNode: 
-    slite.errorPrint(0,"Viewer has no volume assigned to it")
-
-  return sNode
-
-
-def customizeViewer(sWidget,wName):
-  sWidget.setWindowTitle(wName)
-  winHeight=sWidget.height
-  winWidth=sWidget.width
-  sNode=getActiveVolumeNode(sWidget)
-  nSpacing=sNode.GetSpacing()
-  nExtent=sNode.GetImageData().GetExtent()
-  nHeight=nExtent[3] - nExtent[2] + 1
-  nWidth=nExtent[5] - nExtent[4] + 1
-
-  sWidget.resize(winWidth*nWidth*nSpacing[2]/(nHeight*nSpacing[1]),winHeight)
-  sWidget.sliceController().setSliceLink(0)
-
-def ChangeFrame(index,vType):
-  vNode=getViewerVolumeNode(ctrlWin,vType)
-  if vNode:
-     if vType == "fg":
-        imgList=foregroundImage[0]
-     elif vType == "bg":
-        imgList=backgroundImage[0]
-     elif vType == "lm": 
-        imgList=labelmapImage[0]
-     else : 
-        slite.errorPrint(0,"ChangeFrame: Wrong Type")
-
-     if index < len(imgList):
-       vNode.SetAndObserveImageData(imgList[index])
-
-def onSliderFrameChanged(newValue):
-  index=int(newValue)
-
-  ChangeFrame(index,"fg")
-  ChangeFrame(index,"bg")
-  ChangeFrame(index,"lm")
-  
-def onSliderLevelChanged(newValue):
-  vNode=getActiveVolumeNode(ctrlWin) 
-  if vNode:
-    dNode=vNode.GetVolumeDisplayNode() 
-    dNode.AutoWindowLevelOff()
-    dNode.SetLevel(newValue)
+    if True:
+      # reload button
+      # (use this during development, but remove it when delivering
+      #  your module to users)
+      self.exitButton = qt.QPushButton("Exit")
+      self.exitButton.toolTip = "Close down slicer."
+      self.exitButton.name = "sviewer exit"
+      ctrlLayout.addWidget(self.exitButton,4,0)
+      self.exitButton.connect('clicked()', exit)
 
 
-def onSliderWindowChanged(newValue):
-  vNode=getActiveVolumeNode(ctrlWin) 
-  if vNode:
-    dNode=vNode.GetVolumeDisplayNode() 
-    dNode.AutoWindowLevelOff()
-    dNode.SetWindow(newValue)
+    if False:
+      self.plotFrame = ctk.ctkCollapsibleButton()
+      self.plotFrame.text = "Plotting"
+      self.plotFrame.collapsed = 0
+      plotFrameLayout = qt.QGridLayout(self.plotFrame)
+      ctrlLayout.addWidget(self.plotFrame,5,0)
 
-def CreateCtrlPanel(masterWin,collapseFlag):
-  if masterWin:
-    ctrlWin=masterWin
-  else :  
-    ctrlWin=slicer.qMRMLWidget()
-    ctrlWin.setLayout(qt.QGridLayout())
-    ctrlWin.setWindowTitle("4D Control Pannel") 
-    ctrlWin.setMRMLScene(slicer.mrmlScene)
+      #self.plotSettingsFrame = ctk.ctkCollapsibleButton()
+      #self.plotSettingsFrame.text = "Settings"
+      #self.plotSettingsFrame.collapsed = 1
+      #plotSettingsFrameLayout = qt.QGridLayout(self.plotSettingsFrame)
+      #plotFrameLayout.addWidget(self.plotSettingsFrame,0,1)
+     
 
-  ctrlWinLayout = ctrlWin.layout()
+      # taken from  https://github.com/fedorov/MultiVolumeExplorer
 
-  ctrlFrameLabel = qt.QLabel('Frame')
-  ctrlFrameSlider = ctk.ctkSliderWidget()
-  ctrlFrameSlider.minimum=0 
-  ctrlFrameSlider.maximum=len(foregroundImage[0])
+      # add chart container widget
+      self.__chartView = ctk.ctkVTKChartView(self.ctrlWidget)
+      plotFrameLayout.addWidget(self.__chartView,3,0,1,3)
+
+      self.__chart = self.__chartView.chart()
+      self.__chartTable = vtk.vtkTable()
+      self.__xArray = vtk.vtkFloatArray()
+      self.__yArray = vtk.vtkFloatArray()
+      # will crash if there is no name
+      self.__xArray.SetName('')
+      self.__yArray.SetName('signal intensity')
+      self.__chartTable.AddColumn(self.__xArray)
+      self.__chartTable.AddColumn(self.__yArray)
+      #self.onInputChanged()
+      #self.refreshObservers()
+
+    # do not do ctrlWin.show() here - for some reason window does not pop up then 
+    return self.ctrlWidget
+
+  def removeObservers(self):
+    # remove observers and reset
+    for observee,tag in self.styleObserverTags:
+      observee.RemoveObserver(tag)
+    self.styleObserverTags = []
+    self.sliceWidgetsPerStyle = {}
+
+
+  def refreshObservers(self):
+    """ When the layout changes, drop the observers from
+    all the old widgets and create new observers for the
+    newly created widgets"""
+    self.removeObservers()
+    # get new slice nodes
+    sliceNodeCount = slicer.mrmlScene.GetNumberOfNodesByClass('vtkMRMLSliceNode')
+    for nodeIndex in xrange(sliceNodeCount):
+      # find the widget for each node in scene
+      sliceNode = slicer.mrmlScene.GetNthNodeByClass(nodeIndex, 'vtkMRMLSliceNode')
+      sliceWidget = self.layoutManager.sliceWidget(sliceNode.GetLayoutName())
+      if sliceWidget:
+        # add obserservers and keep track of tags
+        style = sliceWidget.sliceView().interactorStyle()
+        self.sliceWidgetsPerStyle[style] = sliceWidget
+        events = ("MouseMoveEvent", "EnterEvent", "LeaveEvent")
+        for event in events:
+          tag = style.AddObserver(event, self.processEvent)
+          self.styleObserverTags.append([style,tag])
+
+  def processEvent(self,observee,event):
+    #if not self.iCharting.checked:
+    #  return
+
+    mvImage = self.nodeImgList[0]
+    mvNodes = self.nodeList[0]
+
+    nComponents = self.numFrames
+
+    # TODO: use a timer to delay calculation and compress events
+    if event == 'LeaveEvent':
+      # reset all the readouts
+      # TODO: reset the label text
+      return
+
+    if not self.sliceWidgetsPerStyle.has_key(observee):
+      return
+
+    sliceWidget = self.sliceWidgetsPerStyle[observee]
+    sliceLogic = sliceWidget.sliceLogic()
+    interactor = observee.GetInteractor()
+    xy = interactor.GetEventPosition()
+    xyz = sliceWidget.sliceView().convertDeviceToXYZ(xy);
+
+    ras = sliceWidget.sliceView().convertXYZToRAS(xyz)
+    bgLayer = sliceLogic.GetForegroundLayer()
+    # GetBackgroundLayer()
+    fgLayer = sliceLogic.GetForegroundLayer()
+
+    volumeNode = mvNodes[0]
+    fgVolumeNode = mvNodes[0]
+    if not volumeNode or volumeNode.GetID() != mvNodes[0].GetID():
+      return
+    #if volumeNode != self.__mvNode:
+    #  return
+
+    nameLabel = volumeNode.GetName()
+    xyToIJK = bgLayer.GetXYToIJKTransform()
+    ijkFloat = xyToIJK.TransformDoublePoint(xyz)
+    ijk = []
+    for element in ijkFloat:
+      try:
+        index = int(round(element))
+      except ValueError:
+        index = 0
+      ijk.append(index)
+
+    extent = mvImage[0].GetExtent()
+    if not (ijk[0]>=extent[0] and ijk[0]<=extent[1] and \
+       ijk[1]>=extent[2] and ijk[1]<=extent[3] and \
+       ijk[2]>=extent[4] and ijk[2]<=extent[5]):
+      # pixel outside the valid extent
+      return
+
+    useFg = False
+    if fgVolumeNode:
+      fgxyToIJK = fgLayer.GetXYToIJKTransform()
+      fgijkFloat = xyToIJK.TransformDoublePoint(xyz)
+      fgijk = []
+      for element in fgijkFloat:
+        try:
+          index = int(round(element))
+        except ValueError:
+          index = 0
+        fgijk.append(index)
+        fgImage = fgVolumeNode.GetImageData()
+
+      fgChartTable = vtk.vtkTable()
+      if fgijk[0] == ijk[0] and fgijk[1] == ijk[1] and fgijk[2] == ijk[2] and \
+          fgImage.GetNumberOfScalarComponents() == mvImage[0].GetNumberOfScalarComponents():
+        useFg = True
+
+        fgxArray = vtk.vtkFloatArray()
+        fgxArray.SetNumberOfTuples(nComponents)
+        fgxArray.SetNumberOfComponents(1)
+        fgxArray.Allocate(nComponents)
+        fgxArray.SetName('frame')
+
+        fgyArray = vtk.vtkFloatArray()
+        fgyArray.SetNumberOfTuples(nComponents)
+        fgyArray.SetNumberOfComponents(1)
+        fgyArray.Allocate(nComponents)
+        fgyArray.SetName('signal intensity')
  
-  ctrlLevelLabel = qt.QLabel('Level')
-  ctrlLevelSlider = ctk.ctkSliderWidget()
+        # will crash if there is no name
+        fgChartTable.AddColumn(fgxArray)
+        fgChartTable.AddColumn(fgyArray)
+        fgChartTable.SetNumberOfRows(nComponents)
 
-  ctrlWindowLabel = qt.QLabel('Window')
-  ctrlWindowSlider = ctk.ctkSliderWidget()
+    # get the vector of values at IJK
+
+    for c in range(nComponents):
+      val = mvImage[0].GetScalarComponentAsDouble(ijk[0],ijk[1],ijk[2],c)
+      self.__chartTable.SetValue(c, 0, self.__mvLabels[c])
+      self.__chartTable.SetValue(c, 1, val)
+      if useFg:
+        fgValue = fgImage.GetScalarComponentAsDouble(ijk[0],ijk[1],ijk[2],c)
+        fgChartTable.SetValue(c,0,self.__mvLabels[c])
+        fgChartTable.SetValue(c,1,fgValue)
+
+    baselineAverageSignal = 0
+    # if self.iChartingPercent.checked:
+    #   # check if percent plotting was requested and recalculate
+    #   nBaselines = min(self.baselineFrames.value,nComponents)
+    #   for c in range(nBaselines):
+    #     baselineAverageSignal += mvImage[0].GetScalarComponentAsDouble(ijk[0],ijk[1],ijk[2],c)
+    #   baselineAverageSignal /= nBaselines
+    #   if baselineAverageSignal != 0:
+    #     for c in range(nComponents):
+    #       intensity = mvImage[0].GetScalarComponentAsDouble(ijk[0],ijk[1],ijk[2],c)
+    #       self.__chartTable.SetValue(c,1,(intensity/baselineAverageSignal-1)*100.)
+
+    self.__chart.RemovePlot(0)
+    self.__chart.RemovePlot(0)
+
+    #if self.iChartingPercent.checked and baselineAverageSignal != 0:
+    #  self.__chart.GetAxis(0).SetTitle('change relative to baseline, %')
+    #else:
+    self.__chart.GetAxis(0).SetTitle('signal intensity')
+
+    #tag = str(self.__mvNode.GetAttribute('MultiVolume.FrameIdentifyingDICOMTagName'))
+    #units = str(self.__mvNode.GetAttribute('MultiVolume.FrameIdentifyingDICOMTagUnits'))
+    #xTitle = tag+', '+units
+    #self.__chart.GetAxis(1).SetTitle(xTitle)
+    #if self.iChartingIntensityFixedAxes.checked == True:
+    self.__chart.GetAxis(0).SetBehavior(vtk.vtkAxis.FIXED)
+    self.__chart.GetAxis(0).SetRange(self.__mvRange[0],self.__mvRange[1])
+    #else:
+    #  self.__chart.GetAxis(0).SetBehavior(vtk.vtkAxis.AUTO)
+    # if useFg:
+    if useFg:
+      plot = self.__chart.AddPlot(vtk.vtkChart.POINTS)
+      if vtk.VTK_MAJOR_VERSION <= 5:
+        plot.SetInput(self.__chartTable, 0, 1)
+      else:
+        plot.SetInputData(self.__chartTable, 0, 1)
+      fgplot = self.__chart.AddPlot(vtk.vtkChart.LINE)
+      if vtk.VTK_MAJOR_VERSION <= 5:
+        fgplot.SetInput(fgChartTable, 0, 1)
+      else:
+        fgplot.SetInputData(fgChartTable, 0, 1)
+    else:
+      plot = self.__chart.AddPlot(vtk.vtkChart.LINE)
+      if vtk.VTK_MAJOR_VERSION <= 5:
+        plot.SetInput(self.__chartTable, 0, 1)
+      else:
+        plot.SetInputData(self.__chartTable, 0, 1)
+      
+    if self.xLogScaleCheckBox.checkState() == 2:
+      title = self.__chart.GetAxis(1).GetTitle()
+      self.__chart.GetAxis(1).SetTitle('log of '+title)
+
+    if self.yLogScaleCheckBox.checkState() == 2:
+      title = self.__chart.GetAxis(0).GetTitle()
+      self.__chart.GetAxis(0).SetTitle('log of '+title)
+    # seems to update only after another plot?..
 
 
-  vNode=getActiveVolumeNode(ctrlWin)
-  if vNode: 
-    vImageRange=vNode.GetImageData().GetScalarRange()
-    ctrlLevelSlider.minimum = vImageRange[0]
-    ctrlWindowSlider.minimum = vImageRange[0]
-    ctrlLevelSlider.maximum = vImageRange[1]
-    ctrlWindowSlider.maximum = vImageRange[1]*2
+  def onInputChanged(self):
+      self.__chartTable.SetNumberOfRows(self.numFrames)
 
-    ctrlLevelSlider.value=vNode.GetVolumeDisplayNode().GetLevel()
-    ctrlWindowSlider.value=vNode.GetVolumeDisplayNode().GetWindow()
+      self.plotFrame.enabled = True
+      self.plotFrame.collapsed = 0
+      self.__xArray.SetNumberOfTuples(self.numFrames)
+      self.__xArray.SetNumberOfComponents(1)
+      self.__xArray.Allocate(self.numFrames)
+      self.__xArray.SetName('frame')
+      self.__yArray.SetNumberOfTuples(self.numFrames)
+      self.__yArray.SetNumberOfComponents(1)
+      self.__yArray.Allocate(self.numFrames)
+      self.__yArray.SetName('signal intensity')
 
-  ctrlFrameSlider.connect('valueChanged(double)', onSliderFrameChanged)
-  ctrlLevelSlider.connect('valueChanged(double)', onSliderLevelChanged)
-  ctrlWindowSlider.connect('valueChanged(double)', onSliderWindowChanged)
+      self.__chartTable = vtk.vtkTable()
+      self.__chartTable.AddColumn(self.__xArray)
+      self.__chartTable.AddColumn(self.__yArray)
+      self.__chartTable.SetNumberOfRows(self.numFrames)
 
-  if collapseFlag:
-    ctrlFrame = ctk.ctkCollapsibleButton()
-    ctrlFrame.text = "Viewer Control"
-    ctrlFrame.collapsed = 0
-    ctrlFrameLayout = qt.QGridLayout(ctrlFrame)
-    ctrlWinLayout.addWidget(ctrlFrame)
-    ctrlLayout=ctrlFrameLayout
-  else: 
-    ctrlLayout=ctrlWinLayout
-  
-  if fourDFlag:  
-    ctrlLayout.addWidget(ctrlFrameLabel, 0, 0)
-    ctrlLayout.addWidget(ctrlFrameSlider, 0, 1)
+      # get the range of intensities for the
+      self.__mvRange = [0,0]
+      for v in self.nodeImgList[0][0]: 
+        frame = v.GetOutput()
+        frameRange = frame.GetScalarRange()
+        self.__mvRange[0] = min(self.__mvRange[0], frameRange[0])
+        self.__mvRange[1] = max(self.__mvRange[1], frameRange[1])
 
-  ctrlLayout.addWidget(ctrlLevelLabel, 1, 0)
-  ctrlLayout.addWidget(ctrlLevelSlider, 1, 1)
-  ctrlLayout.addWidget(ctrlWindowLabel, 2, 0)
-  ctrlLayout.addWidget(ctrlWindowSlider, 2, 1)
+      #self.__mvLabels = string.split(self.__mvNode.GetAttribute('MultiVolume.FrameLabels'),',')
+      #if len(self.__mvLabels) != nFrames:
+      #  return
+      #for l in range(nFrames):
+      #  self.__mvLabels[l] = float(self.__mvLabels[l])
 
-  # do not do ctrlWin.show() here - for some reason window does not pop up then 
-  return ctrlWin
+      self.baselineFrames.maximum = self.numFrames
+
+
+  def LinkViewers(self):
+    if self.sliceNodeList:
+      sliceNode = self.sliceNodeList.values()[0]
+      sliceWidget = self.layoutManager.sliceWidget(sliceNode.GetLayoutName())
+      sliceWidget.sliceController().setSliceLink(1)
+
+  def onSliderFrameChanged(self,newValue):
+    index=int(newValue)
+    for vType in xrange(2):
+      for node,imgList in zip(self.nodeList[vType], self.nodeImgList[vType]) :  
+        if index < len(imgList):
+          node.SetAndObserveImageData(imgList[index])
+
+  def onSliderLevelChanged(self,newValue):
+     for node in self.nodeList[0] : 
+       dNode=node.GetVolumeDisplayNode() 
+       dNode.AutoWindowLevelOff()
+       dNode.SetLevel(newValue)
+
+
+  def onSliderWindowChanged(self,newValue):
+     for node in self.nodeList[0] : 
+       dNode=node.GetVolumeDisplayNode() 
+       dNode.AutoWindowLevelOff()
+       dNode.SetWindow(newValue)
+
+  def setOrientation(self,orientation):
+    if orientation in self.orientations:
+        self.selectedOrientation = orientation
+        self.orientationButtons[orientation].checked = True
+        for sliceNode in self.sliceNodeList.values():
+          sliceNode.SetOrientation(orientation) 
 
 # =======================
 #  Main 
@@ -241,26 +536,58 @@ parser.add_argument( "-b", "--background",  nargs='*', required=False, help="Ima
 parser.add_argument( "-l", "--labelmap",  nargs='*', required=False, help="File name of Label maps", action="append")
 parser.add_argument( "-4", "--fourD", required=False, help="Load in 4D image sequence.", action="store_true", default = False )
 parser.add_argument( "-n", "--window_name", required=False, help="Window name", action="store", default = "Viewer")
+parser.add_argument( "-o", "--orientation", required=False, help="View orientation (Axial, Sagittal, Coronal)", action="store", default = "Axial")
 
 args = parser.parse_args()
 fourDFlag=args.fourD
 
+# remove viewers in main window
+if False: 
+  layoutManager = slicer.app.layoutManager()
+  for node in slicer.util.getNodes('vtkMRMLSliceNode*').values():
+    #sliceWidget = layoutManager.sliceWidget(node.GetLayoutName())
+    # sliceWidget.delete()
+    slicer.mrmlScene.RemoveNode(node)
 #
 # Load Volume 
 #
+(fgNodeList,fgImageList) = loadVolumes(args.foreground,0,fourDFlag)
+(bgNodeList,bgImageList) = loadVolumes(args.background,0,fourDFlag)
+(lmNodeList,lmImageList) = loadVolumes(args.labelmap,1,fourDFlag)
 
-(foregroundNode,foregroundImage)=createRowVolumes(args.foreground,"FG",0,fourDFlag) 
-(backgroundNode,backgroundImage)=createRowVolumes(args.background,"BG",0,fourDFlag) 
-(labelmapNode,labelmapImage)=createRowVolumes(args.labelmap,"LM",1,fourDFlag) 
+# https://github.com/pieper/CompareVolumes/blob/master/CompareVolumes.py
+cvLogic=CompareVolumes.CompareVolumesLogic()
+sliceNodeList = cvLogic.viewerPerVolume(volumeNodes=fgNodeList,background=bgNodeList,label=lmNodeList,orientation=args.orientation)
 
-sliceWidget = []
-sliceWidget.append(slite.createViewer("TEST",foregroundNode, backgroundNode, labelmapNode))
-
-customizeViewer(sliceWidget[0],args.window_name)
-
-# window does not come up for some reason 
-ctrlWin = CreateCtrlPanel(sliceWidget[0],1)
+cpWidget=CtrlPanelWidget(sliceNodeList,fgNodeList,fgImageList,bgNodeList,bgImageList,lmNodeList,lmImageList)
+ctrlWin = cpWidget.CreateCtrlPanel(args.window_name,"")
 ctrlWin.show()
+
+#sWidget = slicer.qMRMLSliceWidget()
+#sWidget.setMRMLScene(slicer.mrmlScene)
+
+#layoutManager = slicer.app.layoutManager()
+#viewName = fgNodeList[0].GetName() + '-Axial'
+#sliceWidget = layoutManager.sliceWidget(viewName)
+#sliceWidget.sliceController().setSliceLink(1)
+
+#sliceNodes = slicer.util.getNodes('vtkMRMLSliceNode*')
+#layoutManager = slicer.app.layoutManager()
+#for sliceNode in sliceNodes.values():
+#  sliceWidget = layoutManager.sliceWidget(sliceNode.GetLayoutName())
+#  if sliceWidget:  
+#      print sliceNode.GetName()
+#      sliceWidget.sliceController().setSliceLink(1)
+
+#sliceNode = sliceWidget.mrmlSliceNode()
+#sliceNode.SetOrientation(orientation)
+
+#orientations = ('Axial', 'Sagittal', 'Coronal')
+
+
+# window does not come up for some reason if we do not do it that way 
+
+#
 
  
 # Debug stuff 
