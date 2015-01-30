@@ -2,7 +2,9 @@ import viewerUtilities
 import qt
 import argparse
 import CompareVolumes
+import liteViewer
 
+liteViewer.Exit_On_Error_Flag=False
 
 class MultiCaseWidget:
   def __init__(self,preFileList,cases,postFileList):
@@ -18,7 +20,11 @@ class MultiCaseWidget:
 
     self.cpWidget=viewerUtilities.CtrlPanelWidget(None,None,None,None,None,None,None,orientation)
     self.loadNextCase()
-
+    if not self.activeCase :
+      liteViewer.errorPrint(0,"Nothing to do!")
+      exit()
+      return       
+ 
     self.cvLogic=CompareVolumes.CompareVolumesLogic()
     sliceNodeList = self.cvLogic.viewerPerVolume(volumeNodes=self.cpWidget.nodeList[0],background=self.cpWidget.nodeList[1],label=self.cpWidget.nodeList[2],orientation=orientation)
     self.cpWidget.sliceNodeList = sliceNodeList
@@ -35,26 +41,37 @@ class MultiCaseWidget:
     self.ctrlWin.show()
 
   def loadNextCase(self):
-    self.activeCase=self.caseList.pop(0)
-
-    if self.activeCase: 
+    
+    while len(self.caseList):
+      self.activeCase=self.caseList.pop(0)
       # Load Volumes of first case
       nodeList = [] 
       nodeImgList  = [] 
+      missingList = []
       for vType in xrange(3):
         fileList = []
         if len(postList[vType]):  
           for BASE,FILE in zip(preList,postList[vType]) :
             fileList.append(BASE + self.activeCase + FILE )
-      
-        (nodes,images) = viewerUtilities.loadVolumes(fileList,vType > 1,fourDFlag)
-        nodeList.append(nodes)
-        nodeImgList.append(images)
-      
-      self.cpWidget.setNodeListsAndDisplay(nodeList,nodeImgList,1)   
-      if self.cpWidget.ctrlWidget:
-         self.cpWidget.ctrlWidget.setWindowTitle(self.activeCase) 
- 
+
+        (nodes,images,missing) = viewerUtilities.loadVolumes(fileList,vType > 1,fourDFlag)
+
+        if len(missing) :
+           missingList.extend(missing)
+        else :
+          nodeList.append(nodes)
+          nodeImgList.append(images)
+     
+      if len(missingList):
+         liteViewer.errorPrint(1,"Going to next case as the following files could not be loaded for %s: %s" % (self.activeCase, missingList )) 
+         self.activeCase = None
+
+      else:
+        self.cpWidget.setNodeListsAndDisplay(nodeList,nodeImgList,1)   
+        if self.cpWidget.ctrlWidget:
+          self.cpWidget.ctrlWidget.setWindowTitle(self.activeCase) 
+        break
+
   def showNext(self):
     # Load Next 
     self.loadNextCase()
@@ -79,6 +96,11 @@ parser.add_argument( "-o", "--orientation", required=False, help="View orientati
 
 args = parser.parse_args()
 fourDFlag=args.fourD
+
+# remove other viewers
+layoutManager = slicer.app.layoutManager()
+for node in slicer.util.getNodes('vtkMRMLSliceNode*').values():
+     slicer.mrmlScene.RemoveNode(node)
 
 #
 # Load Volume 

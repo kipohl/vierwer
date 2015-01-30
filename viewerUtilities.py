@@ -84,7 +84,8 @@ def load4DVolume(listFileNames,labelFlag):
     # Load first volume
     vNode = liteViewer.loadVolume(firstFileName,labelFlag)
     if not vNode: 
-      liteViewer.errorPrint(0,"Could not load %s!", firstFileName)  
+      liteViewer.errorPrint(0,"Could not load %s!" %  firstFileName)  
+      return (None,None)
 
     iVtkList=[vNode.GetImageData()]
     #
@@ -95,6 +96,8 @@ def load4DVolume(listFileNames,labelFlag):
          img=ReadImageSlicer(FILE)
          if img:
            iVtkList.append(img)
+         else :
+           return (None,None)
 
        return (vNode,iVtkList)
 
@@ -126,9 +129,10 @@ def loadVolumes(fileList,labelFlag,fourDFlag):
 
    imgList=[]    
    volNodeList=[]
+   missingList=[]
 
    if not fileList: 
-     return (volNodeList,imgList)
+     return (volNodeList,imgList,missingList)
    
    if isinstance(fileList, basestring) :
      fileList = [ fileList ]
@@ -140,11 +144,13 @@ def loadVolumes(fileList,labelFlag,fourDFlag):
    # For multiple input   
    for index in xrange(numVolumes):
      (volNode,iList) = load4DVolume(fileList[index],labelFlag)
+     if volNode: 
+       volNodeList.append(volNode)    
+       imgList.append(iList)
+     else :
+       missingList.append(fileList[index])
    
-     volNodeList.append(volNode)    
-     imgList.append(iList)
-   
-   return (volNodeList,imgList)
+   return (volNodeList,imgList,missingList)
 
 class CtrlPanelWidget:
   def __init__(self,sliceNodes,fgNodeList,fgNodeImgList,bgNodeList,bgNodeImgList,lmNodeList,lmNodeImgList,orientation):

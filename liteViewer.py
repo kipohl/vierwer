@@ -5,19 +5,24 @@ from __main__ import sys, qt, vtk, slicer
 # Set the path in slite.sh correctly and then simply execute ./slite.sh <file name 1> <file name 2> ....
 # then the program creates an extra viewer for each file 
 # 
-
+  
 #
 # Functions 
 #
+
+Exit_On_Error_Flag=True
+
 def errorPrint(guiFlag,txt):
   if guiFlag:
-      qt.QMessageBox.warning(None, "slite", txt)   
+      qt.QMessageBox.warning(None, "liteViewer", txt)   
   else: 
       print " "
       print "Error: %s" % (txt)   
       print " "
 
-  sys.exit(1)
+  if Exit_On_Error_Flag : 
+     print "Exiting now"
+     sys.exit(1)
 
 def loadVolume(fileName,labelFlag):
    if labelFlag:
