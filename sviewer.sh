@@ -1,16 +1,18 @@
 #! /bin/bash -f
-# A really quick image viewer (Slicer needs to be build in release build otherwise too slow 
+# Just the viewer of slicer 
+# call ./sviewer <TYPE> Options
+# TYPE: lite, single, compare, cases 
+SLICER="/software/Slicer4/releasebuild/Slicer-build/Slicer"
+CMD="$SLICER --no-splash --disable-scripted-loadable-modules  --disable-cli-modules"
+TYPE=$1
+shift 
+if [ "$TYPE" == "lite" -o "$TYPE" == "single" ]; then 
+ CMD="${CMD} --no-main-window"
+fi 
 
-SLICERSUPER=/software/Slicer4/releasebuild
-# --no-main-window
-CMD="${SLICERSUPER}/Slicer-build/Slicer --no-splash --disable-scripted-loadable-modules  --disable-cli-modules"
-# CMD="$CMD --no-main-window"
 if [ "$1" == "-i" ]; then 
   CMD="$CMD --show-python-interactor"
   shift
 fi
 
-$CMD --python-script ./sviewer.py $*
-
-# --verbose-module-discovery 
-#
+$CMD --python-script `dirname $0`/${TYPE}Viewer.py $*

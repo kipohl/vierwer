@@ -1,10 +1,7 @@
 import argparse
 import os 
 import vtk.util.numpy_support
-import numpy
 import nibabel as nib
-
-import CompareVolumes
 import slite
 #
 # Functions
@@ -131,11 +128,13 @@ def loadVolumes(fileList,labelFlag,fourDFlag):
    if not fileList: 
      return (volNodeList,imgList)
    
-   if not fourDFlag:
+   if isinstance(fileList, basestring) :
+     fileList = [ fileList ]
+   elif not fourDFlag:
      fileList=[item for sublist in fileList for item in sublist]
 
-   numVolumes=len(fileList)
 
+   numVolumes=len(fileList)
    # For multiple input   
    for index in xrange(numVolumes):
      (volNode,iList) = load4DVolume(fileList[index],labelFlag)
@@ -210,28 +209,27 @@ class CtrlPanelWidget:
 
     #self.orientationBox = qt.QGroupBox("Orientation")
     #self.orientationBox.setLayout(qt.QFormLayout())
-    self.orientationButtons = {}
-    index=0
-    for orientation in self.orientations:
-      self.orientationButtons[orientation] = qt.QRadioButton()
-      self.orientationButtons[orientation].text = orientation
-      # self.orientationBox.layout().addWidget(self.orientationButtons[orientation])
-      ctrlLayout.addWidget(self.orientationButtons[orientation],3,index)
-      self.orientationButtons[orientation].connect("clicked()",lambda o=orientation: self.setOrientation(o))
-      index+=1
 
-    # parametersFormLayout.addWidget(self.orientationBox)
-    self.setOrientation(self.orientations[0])
+    if self.sliceNodeList : 
+      self.orientationButtons = {}
+      index=0
+      for orientation in self.orientations:
+        self.orientationButtons[orientation] = qt.QRadioButton()
+        self.orientationButtons[orientation].text = orientation
+        # self.orientationBox.layout().addWidget(self.orientationButtons[orientation])
+        ctrlLayout.addWidget(self.orientationButtons[orientation],3,index)
+        self.orientationButtons[orientation].connect("clicked()",lambda o=orientation: self.setOrientation(o))
+        index+=1
 
-    if True:
-      # reload button
-      # (use this during development, but remove it when delivering
-      #  your module to users)
-      self.exitButton = qt.QPushButton("Exit")
-      self.exitButton.toolTip = "Close down slicer."
-      self.exitButton.name = "sviewer exit"
-      ctrlLayout.addWidget(self.exitButton,4,0)
-      self.exitButton.connect('clicked()', exit)
+      self.setOrientation(self.orientations[0])
+
+    # (use this during development, but remove it when delivering
+    #  your module to users)
+    self.exitButton = qt.QPushButton("Exit")
+    self.exitButton.toolTip = "Close down slicer."
+    self.exitButton.name = "sviewer exit" 
+    ctrlLayout.addWidget(self.exitButton,4,1)
+    self.exitButton.connect('clicked()', exit)
 
 
     if False:
@@ -499,7 +497,7 @@ class CtrlPanelWidget:
 
   def onSliderFrameChanged(self,newValue):
     index=int(newValue)
-    for vType in xrange(2):
+    for vType in xrange(3):
       for node,imgList in zip(self.nodeList[vType], self.nodeImgList[vType]) :  
         if index < len(imgList):
           node.SetAndObserveImageData(imgList[index])
@@ -518,76 +516,53 @@ class CtrlPanelWidget:
        dNode.SetWindow(newValue)
 
   def setOrientation(self,orientation):
-    if orientation in self.orientations:
-        self.selectedOrientation = orientation
-        self.orientationButtons[orientation].checked = True
-        for sliceNode in self.sliceNodeList.values():
-          sliceNode.SetOrientation(orientation) 
+    if self.sliceNodeList : 
+      if orientation in self.orientations:
+         self.selectedOrientation = orientation
+         self.orientationButtons[orientation].checked = True
+         for sliceNode in self.sliceNodeList.values():
+            sliceNode.SetOrientation(orientation) 
+
 
 # =======================
 #  Main 
 # =======================
+if __name__ == '__main__':
+  parser = argparse.ArgumentParser( description="Fast 2D viewer for single 3D+t MRs (fg,bg,labelmap)" )
+  parser.add_argument( "-f", "--foreground", nargs="+", required=True, help="MR file shown in foreground.", action="append")
+  parser.add_argument( "-b", "--background", nargs='*', required=False, help="MR file shown in background.", action="append")
+  parser.add_argument( "-l", "--labelmap", nargs='*', required=False, help="MR File of Label map", action="append")
+  parser.add_argument( "-4", "--fourD", required=False, help="Load in 4D image sequence.", action="store_true", default = False )
+  parser.add_argument( "-n", "--window_name", required=False, help="Window name", action="store", default = "Viewer")
+  parser.add_argument( "-o", "--orientation", required=False, help="View orientation (Axial, Sagittal, Coronal)", action="store", default = "Axial")
+  
+  args = parser.parse_args()
+  fourDFlag=args.fourD
+  
+  #
+  # Load Volume 
+  #
+  (fgNodeList,fgImageList) = loadVolumes(args.foreground,0,fourDFlag)
+  (bgNodeList,bgImageList) = loadVolumes(args.background,0,fourDFlag)
+  (lmNodeList,lmImageList) = loadVolumes(args.labelmap,1,fourDFlag)
+  
+  if len(bgNodeList) :
+       bgNode= bgNodeList[0]
+  else: 
+       bgNode= None
 
-# first entry is slite.py
+  if len(lmNodeList) :
+       lmNode= lmNodeList[0]
+  else: 
+       lmNode= None
+ 
+  sliceWidget=slite.createViewer("TEST",fgNodeList[0], bgNode, lmNode)
+  cpWidget=CtrlPanelWidget("",fgNodeList,fgImageList,bgNodeList,bgImageList,lmNodeList,lmImageList)
+  ctrlWin = cpWidget.CreateCtrlPanel(args.window_name,sliceWidget)
 
-parser = argparse.ArgumentParser( description="A 3D viewer of a single or multiple MRs" )
-parser.add_argument( "-f", "--foreground",  nargs='+', required=True, help="Images shown in foreground.", action="append")
-parser.add_argument( "-b", "--background",  nargs='*', required=False, help="Images shown in background.", action="append")
-parser.add_argument( "-l", "--labelmap",  nargs='*', required=False, help="File name of Label maps", action="append")
-parser.add_argument( "-4", "--fourD", required=False, help="Load in 4D image sequence.", action="store_true", default = False )
-parser.add_argument( "-n", "--window_name", required=False, help="Window name", action="store", default = "Viewer")
-parser.add_argument( "-o", "--orientation", required=False, help="View orientation (Axial, Sagittal, Coronal)", action="store", default = "Axial")
-
-args = parser.parse_args()
-fourDFlag=args.fourD
-
-# remove viewers in main window
-if False: 
-  layoutManager = slicer.app.layoutManager()
-  for node in slicer.util.getNodes('vtkMRMLSliceNode*').values():
-    #sliceWidget = layoutManager.sliceWidget(node.GetLayoutName())
-    # sliceWidget.delete()
-    slicer.mrmlScene.RemoveNode(node)
-#
-# Load Volume 
-#
-(fgNodeList,fgImageList) = loadVolumes(args.foreground,0,fourDFlag)
-(bgNodeList,bgImageList) = loadVolumes(args.background,0,fourDFlag)
-(lmNodeList,lmImageList) = loadVolumes(args.labelmap,1,fourDFlag)
-
-# https://github.com/pieper/CompareVolumes/blob/master/CompareVolumes.py
-cvLogic=CompareVolumes.CompareVolumesLogic()
-sliceNodeList = cvLogic.viewerPerVolume(volumeNodes=fgNodeList,background=bgNodeList,label=lmNodeList,orientation=args.orientation)
-
-cpWidget=CtrlPanelWidget(sliceNodeList,fgNodeList,fgImageList,bgNodeList,bgImageList,lmNodeList,lmImageList)
-ctrlWin = cpWidget.CreateCtrlPanel(args.window_name,"")
-ctrlWin.show()
-
-#sWidget = slicer.qMRMLSliceWidget()
-#sWidget.setMRMLScene(slicer.mrmlScene)
-
-#layoutManager = slicer.app.layoutManager()
-#viewName = fgNodeList[0].GetName() + '-Axial'
-#sliceWidget = layoutManager.sliceWidget(viewName)
-#sliceWidget.sliceController().setSliceLink(1)
-
-#sliceNodes = slicer.util.getNodes('vtkMRMLSliceNode*')
-#layoutManager = slicer.app.layoutManager()
-#for sliceNode in sliceNodes.values():
-#  sliceWidget = layoutManager.sliceWidget(sliceNode.GetLayoutName())
-#  if sliceWidget:  
-#      print sliceNode.GetName()
-#      sliceWidget.sliceController().setSliceLink(1)
-
-#sliceNode = sliceWidget.mrmlSliceNode()
-#sliceNode.SetOrientation(orientation)
-
-#orientations = ('Axial', 'Sagittal', 'Coronal')
-
-
-# window does not come up for some reason if we do not do it that way 
-
-#
+  ## window does not come up for some reason if we do not do it that way 
+  ctrlWin.show()
+  
 
  
 # Debug stuff 
