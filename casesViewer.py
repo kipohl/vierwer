@@ -18,7 +18,7 @@ class MultiCaseWidget:
     if self.ctrlWin:
        return 
 
-    self.cpWidget=viewerUtilities.CtrlPanelWidget(None,None,None,None,None,None,None,orientation)
+    self.cpWidget=viewerUtilities.CtrlPanelWidget(None,None,None,None,None,None,None,None,orientation)
     self.loadNextCase()
     if not self.activeCase :
       liteViewer.errorPrint(0,"Nothing to do!")
@@ -53,7 +53,7 @@ class MultiCaseWidget:
         if len(postList[vType]):  
           for BASE,FILE in zip(preList,postList[vType]) :
             fileList.append(BASE + self.activeCase + FILE )
-
+      
         (nodes,images,missing) = viewerUtilities.loadVolumes(fileList,vType > 1,fourDFlag)
 
         if len(missing) :
@@ -106,8 +106,10 @@ for node in slicer.util.getNodes('vtkMRMLSliceNode*').values():
 # Load Volume 
 #
 
-# Create Lists 
+# Create Lists
+print args.cases 
 caseList=[item for sublist in args.cases for item in sublist]
+print caseList
 postList= []
 postList.append([item for sublist in args.fgPostfix for item in sublist])
 

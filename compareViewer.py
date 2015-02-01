@@ -16,15 +16,15 @@ fourDFlag=args.fourD
 #
 # Load Volume 
 #
-(fgNodeList,fgImageList) = viewerUtilities.loadVolumes(args.foreground,0,fourDFlag)
-(bgNodeList,bgImageList) = viewerUtilities.loadVolumes(args.background,0,fourDFlag)
-(lmNodeList,lmImageList) = viewerUtilities.loadVolumes(args.labelmap,1,fourDFlag)
+(fgNodeList,fgImageList,missingList) = viewerUtilities.loadVolumes(args.foreground,0,fourDFlag)
+(bgNodeList,bgImageList,missingList) = viewerUtilities.loadVolumes(args.background,0,fourDFlag)
+(lmNodeList,lmImageList,missingList) = viewerUtilities.loadVolumes(args.labelmap,1,fourDFlag)
 
 # https://github.com/pieper/CompareVolumes/blob/master/CompareVolumes.py
 cvLogic=CompareVolumes.CompareVolumesLogic()
 sliceNodeList = cvLogic.viewerPerVolume(volumeNodes=fgNodeList,background=bgNodeList,label=lmNodeList,orientation=args.orientation)
 
-cpWidget=viewerUtilities.CtrlPanelWidget(sliceNodeList,fgNodeList,fgImageList,bgNodeList,bgImageList,lmNodeList,lmImageList,args.orientation)
+cpWidget=viewerUtilities.CtrlPanelWidget(sliceNodeList,None,fgNodeList,fgImageList,bgNodeList,bgImageList,lmNodeList,lmImageList,args.orientation)
 ctrlWin = cpWidget.setup(args.window_name,"")
 ctrlWin.show()
 

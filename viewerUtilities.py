@@ -136,9 +136,8 @@ def loadVolumes(fileList,labelFlag,fourDFlag):
    
    if isinstance(fileList, basestring) :
      fileList = [ fileList ]
-   elif not fourDFlag:
+   elif not fourDFlag and (len(fileList) > 1 or not isinstance(fileList[0], basestring)):
      fileList=[item for sublist in fileList for item in sublist]
-
 
    numVolumes=len(fileList)
    # For multiple input   
@@ -153,8 +152,9 @@ def loadVolumes(fileList,labelFlag,fourDFlag):
    return (volNodeList,imgList,missingList)
 
 class CtrlPanelWidget:
-  def __init__(self,sliceNodes,fgNodeList,fgNodeImgList,bgNodeList,bgNodeImgList,lmNodeList,lmNodeImgList,orientation):
-    self.sliceNodeList = sliceNodes   
+  def __init__(self,sliceNodes,sliceWidget,fgNodeList,fgNodeImgList,bgNodeList,bgNodeImgList,lmNodeList,lmNodeImgList,orientation):
+    self.sliceNodeList = sliceNodes
+    self.singleViewerWidget = sliceWidget   
     self.nodeType = ('FG', 'BG', 'LM')
     self.nodeList=[fgNodeList,bgNodeList,lmNodeList]
     self.nodeImgList=[fgNodeImgList,bgNodeImgList,lmNodeImgList]
@@ -165,6 +165,7 @@ class CtrlPanelWidget:
     self.ctrlFrameSlider = None
     self.ctrlLevelSlider = None
     self.ctrlWindowSlider = None
+    self.styleObserverTags = []
 
   def setup(self,wName,parent):
     if self.ctrlWidget : 
@@ -229,37 +230,33 @@ class CtrlPanelWidget:
 
     self.setOrientation(self.selectedOrientation)
 
-    # (use this during development, but remove it when delivering
-    #  your module to users)
-    self.buttonPanel=qt.QWidget()
-    self.buttonPanel.setLayout(qt.QGridLayout())
-    ctrlLayout.addWidget(self.buttonPanel)
-
-    self.exitButton = qt.QPushButton("Exit")
-    self.exitButton.toolTip = "Close down slicer."
-    self.exitButton.name = "sviewer exit" 
-    self.buttonPanel.layout().addWidget(self.exitButton,0,0)
-    self.exitButton.connect('clicked()', exit)
-
     if False:
-      self.plotFrame = ctk.ctkCollapsibleButton()
-      self.plotFrame.text = "Plotting"
-      self.plotFrame.collapsed = 0
+      #self.plotFrame = ctk.ctkCollapsibleButton()
+      #self.plotFrame.text = "Plotting"
+      #self.plotFrame.collapsed = 0
+      self.plotFrame=qt.QWidget()
       plotFrameLayout = qt.QGridLayout(self.plotFrame)
       ctrlLayout.addWidget(self.plotFrame)
-
-      #self.plotSettingsFrame = ctk.ctkCollapsibleButton()
-      #self.plotSettingsFrame.text = "Settings"
-      #self.plotSettingsFrame.collapsed = 1
-      #plotSettingsFrameLayout = qt.QGridLayout(self.plotSettingsFrame)
-      #plotFrameLayout.addWidget(self.plotSettingsFrame,0,1)
      
 
-      # taken from  https://github.com/fedorov/MultiVolumeExplorer
+      self.plotSettingsFrame = ctk.ctkCollapsibleButton()
+      self.plotSettingsFrame.text = "Settings"
+      self.plotSettingsFrame.collapsed = 1
+      plotSettingsFrameLayout = qt.QGridLayout(self.plotSettingsFrame)
+      #plotFrameLayout.addWidget(self.plotSettingsFrame,0,1)
 
-      # add chart container widget
-      self.__chartView = ctk.ctkVTKChartView(self.ctrlWidget)
-      plotFrameLayout.addWidget(self.__chartView,3,0,1,3)
+      self.xLogScaleCheckBox = qt.QCheckBox()
+      self.xLogScaleCheckBox.setChecked(0)
+
+      self.yLogScaleCheckBox = qt.QCheckBox()
+      self.yLogScaleCheckBox.setChecked(0)
+
+
+      # taken from  https://github.com/fedorov/MultiVolumeExplorer
+      self.__chartView = ctk.ctkVTKChartView(self.ctrlWidget) 
+      # self.plotFrame)
+      #  self.ctrlWidget 
+      plotFrameLayout.addWidget(self.__chartView,0,0)
 
       self.__chart = self.__chartView.chart()
       self.__chartTable = vtk.vtkTable()
@@ -270,8 +267,19 @@ class CtrlPanelWidget:
       self.__yArray.SetName('signal intensity')
       self.__chartTable.AddColumn(self.__xArray)
       self.__chartTable.AddColumn(self.__yArray)
-      #self.onInputChanged()
-      #self.refreshObservers()
+
+      self.onInputChanged()
+      self.refreshObservers()
+
+    self.buttonPanel=qt.QWidget()
+    self.buttonPanel.setLayout(qt.QGridLayout())
+    ctrlLayout.addWidget(self.buttonPanel)
+
+    self.exitButton = qt.QPushButton("Exit")
+    self.exitButton.toolTip = "Close down slicer."
+    self.exitButton.name = "sviewer exit" 
+    self.buttonPanel.layout().addWidget(self.exitButton,0,0)
+    self.exitButton.connect('clicked()', exit)
 
     # do not do ctrlWin.show() here - for some reason window does not pop up then 
     return self.ctrlWidget
@@ -290,12 +298,16 @@ class CtrlPanelWidget:
     newly created widgets"""
     self.removeObservers()
     # get new slice nodes
-    sliceNodeCount = slicer.mrmlScene.GetNumberOfNodesByClass('vtkMRMLSliceNode')
-    for nodeIndex in xrange(sliceNodeCount):
-      # find the widget for each node in scene
-      sliceNode = slicer.mrmlScene.GetNthNodeByClass(nodeIndex, 'vtkMRMLSliceNode')
-      sliceWidget = self.layoutManager.sliceWidget(sliceNode.GetLayoutName())
-      if sliceWidget:
+    sWidgetList = [] 
+    if self.sliceNodeList : 
+      for snode in self.sliceNodeList.values() :
+        sliceWidget = self.layoutManager.sliceWidget(sNode.GetLayoutName())
+        if sliceWidget:
+           sWidgetList.append(sliceWidget)
+    else:
+      sWidgetList.append(self.singleViewerWidget)
+   
+    for sliceWidget in sWidgetList : 
         # add obserservers and keep track of tags
         style = sliceWidget.sliceView().interactorStyle()
         self.sliceWidgetsPerStyle[style] = sliceWidget
@@ -307,9 +319,9 @@ class CtrlPanelWidget:
   def processEvent(self,observee,event):
     #if not self.iCharting.checked:
     #  return
-
-    mvImage = self.nodeImgList[0]
-    mvNodes = self.nodeList[0]
+    fgImages = self.nodeImgList[0]
+    mvImage = fgImages[0]
+    fgNodes = self.nodeList[0]
 
     nComponents = self.numFrames
 
@@ -322,6 +334,7 @@ class CtrlPanelWidget:
     if not self.sliceWidgetsPerStyle.has_key(observee):
       return
 
+    print "update plot"
     sliceWidget = self.sliceWidgetsPerStyle[observee]
     sliceLogic = sliceWidget.sliceLogic()
     interactor = observee.GetInteractor()
@@ -329,13 +342,15 @@ class CtrlPanelWidget:
     xyz = sliceWidget.sliceView().convertDeviceToXYZ(xy);
 
     ras = sliceWidget.sliceView().convertXYZToRAS(xyz)
+    # still set bgLayer  
     bgLayer = sliceLogic.GetForegroundLayer()
     # GetBackgroundLayer()
     fgLayer = sliceLogic.GetForegroundLayer()
 
-    volumeNode = mvNodes[0]
-    fgVolumeNode = mvNodes[0]
-    if not volumeNode or volumeNode.GetID() != mvNodes[0].GetID():
+    volumeNode = fgNodes[0]
+    fgVolumeNode = fgNodes[0]
+    if not volumeNode or volumeNode.GetID() != fgNodes[0].GetID():
+      print "Do nothing"
       return
     #if volumeNode != self.__mvNode:
     #  return
@@ -355,7 +370,8 @@ class CtrlPanelWidget:
     if not (ijk[0]>=extent[0] and ijk[0]<=extent[1] and \
        ijk[1]>=extent[2] and ijk[1]<=extent[3] and \
        ijk[2]>=extent[4] and ijk[2]<=extent[5]):
-      # pixel outside the valid extent
+      print "pixel outside the valid extent"
+
       return
 
     useFg = False
@@ -372,7 +388,8 @@ class CtrlPanelWidget:
         fgImage = fgVolumeNode.GetImageData()
 
       fgChartTable = vtk.vtkTable()
-      if fgijk[0] == ijk[0] and fgijk[1] == ijk[1] and fgijk[2] == ijk[2] and \
+      # Kilian
+      if False and fgijk[0] == ijk[0] and fgijk[1] == ijk[1] and fgijk[2] == ijk[2] and \
           fgImage.GetNumberOfScalarComponents() == mvImage[0].GetNumberOfScalarComponents():
         useFg = True
 
@@ -394,16 +411,16 @@ class CtrlPanelWidget:
         fgChartTable.SetNumberOfRows(nComponents)
 
     # get the vector of values at IJK
-
     for c in range(nComponents):
-      val = mvImage[0].GetScalarComponentAsDouble(ijk[0],ijk[1],ijk[2],c)
+      val = mvImage[c].GetScalarComponentAsDouble(ijk[0],ijk[1],ijk[2],0)
       self.__chartTable.SetValue(c, 0, self.__mvLabels[c])
       self.__chartTable.SetValue(c, 1, val)
+      print (c,val)
       if useFg:
-        fgValue = fgImage.GetScalarComponentAsDouble(ijk[0],ijk[1],ijk[2],c)
+        fgValue = fgImage.GetScalarComponentAsDouble(ijk[0],ijk[1],ijk[2],0)
         fgChartTable.SetValue(c,0,self.__mvLabels[c])
         fgChartTable.SetValue(c,1,fgValue)
-
+ 
     baselineAverageSignal = 0
     # if self.iChartingPercent.checked:
     #   # check if percent plotting was requested and recalculate
@@ -427,7 +444,7 @@ class CtrlPanelWidget:
     #tag = str(self.__mvNode.GetAttribute('MultiVolume.FrameIdentifyingDICOMTagName'))
     #units = str(self.__mvNode.GetAttribute('MultiVolume.FrameIdentifyingDICOMTagUnits'))
     #xTitle = tag+', '+units
-    #self.__chart.GetAxis(1).SetTitle(xTitle)
+    self.__chart.GetAxis(1).SetTitle("Hello")
     #if self.iChartingIntensityFixedAxes.checked == True:
     self.__chart.GetAxis(0).SetBehavior(vtk.vtkAxis.FIXED)
     self.__chart.GetAxis(0).SetRange(self.__mvRange[0],self.__mvRange[1])
@@ -466,7 +483,7 @@ class CtrlPanelWidget:
       self.__chartTable.SetNumberOfRows(self.numFrames)
 
       self.plotFrame.enabled = True
-      self.plotFrame.collapsed = 0
+      # self.plotFrame.collapsed = 0
       self.__xArray.SetNumberOfTuples(self.numFrames)
       self.__xArray.SetNumberOfComponents(1)
       self.__xArray.Allocate(self.numFrames)
@@ -484,18 +501,19 @@ class CtrlPanelWidget:
       # get the range of intensities for the
       self.__mvRange = [0,0]
       for v in self.nodeImgList[0][0]: 
-        frame = v.GetOutput()
+        frame = v
         frameRange = frame.GetScalarRange()
         self.__mvRange[0] = min(self.__mvRange[0], frameRange[0])
         self.__mvRange[1] = max(self.__mvRange[1], frameRange[1])
 
-      #self.__mvLabels = string.split(self.__mvNode.GetAttribute('MultiVolume.FrameLabels'),',')
+      # self.__mvLabels = string.split(self.__mvNode.GetAttribute('MultiVolume.FrameLabels'),',')
       #if len(self.__mvLabels) != nFrames:
       #  return
-      #for l in range(nFrames):
-      #  self.__mvLabels[l] = float(self.__mvLabels[l])
+      self.__mvLabels = []
+      for l in range(self.numFrames):
+        self.__mvLabels.append(float(l))
 
-      self.baselineFrames.maximum = self.numFrames
+      # self.baselineFrames.maximum = self.numFrames
 
 
   def LinkViewers(self):

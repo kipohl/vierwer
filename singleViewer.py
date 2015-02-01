@@ -16,9 +16,9 @@ fourDFlag=args.fourD
 #
 # Load Volume 
 #
-(fgNodeList,fgImageList) = viewerUtilities.loadVolumes(args.foreground,0,fourDFlag)
-(bgNodeList,bgImageList) = viewerUtilities.loadVolumes(args.background,0,fourDFlag)
-(lmNodeList,lmImageList) = viewerUtilities.loadVolumes(args.labelmap,1,fourDFlag)
+(fgNodeList,fgImageList,missingList) = viewerUtilities.loadVolumes(args.foreground,0,fourDFlag)
+(bgNodeList,bgImageList,missingList) = viewerUtilities.loadVolumes(args.background,0,fourDFlag)
+(lmNodeList,lmImageList,missingList) = viewerUtilities.loadVolumes(args.labelmap,1,fourDFlag)
 
 if len(bgNodeList) :
      bgNode= bgNodeList[0]
@@ -31,7 +31,7 @@ else:
      lmNode= None
 
 sliceWidget=liteViewer.createViewer("TEST",fgNodeList[0], bgNode, lmNode)
-cpWidget=viewerUtilities.CtrlPanelWidget("",fgNodeList,fgImageList,bgNodeList,bgImageList,lmNodeList,lmImageList,args.orientation)
+cpWidget=viewerUtilities.CtrlPanelWidget("",sliceWidget,fgNodeList,fgImageList,bgNodeList,bgImageList,lmNodeList,lmImageList,args.orientation)
 cpWidget.setup(args.window_name,sliceWidget)
 ## window does not come up for some reason if we do not do it that way 
 sliceWidget.show()
