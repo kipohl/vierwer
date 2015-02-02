@@ -588,8 +588,9 @@ class CtrlPanelWidget:
     # update display 
     if self.sliceNodeList : 
       index = 0 
-      for snode in self.sliceNodeList.values() :
-        sWidget = self.layoutManager.sliceWidget(snode.GetLayoutName())
+      for vName in sorted(self.sliceNodeList.keys()):
+        sNode = self.sliceNodeList[vName]
+        sWidget = self.layoutManager.sliceWidget(sNode.GetLayoutName())
         sComposite=sWidget.sliceLogic().GetSliceCompositeNode()
         if self.nodeList[0] and (len(self.nodeList[0]) > index) and self.nodeList[0][index]: 
           sComposite.SetForegroundVolumeID(self.nodeList[0][index].GetID())

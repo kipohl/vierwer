@@ -107,9 +107,7 @@ for node in slicer.util.getNodes('vtkMRMLSliceNode*').values():
 #
 
 # Create Lists
-print args.cases 
 caseList=[item for sublist in args.cases for item in sublist]
-print caseList
 postList= []
 postList.append([item for sublist in args.fgPostfix for item in sublist])
 
