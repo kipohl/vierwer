@@ -1,8 +1,13 @@
 import argparse
 import viewerUtilities
 import liteViewer
+
+# if call for help 
+if len(sys.argv) > 1 and sys.argv[1] == "--help_all" : 
+   sys.argv[1] = "-h"
  
 parser = argparse.ArgumentParser( description="Fast 2D viewer for single 3D+t MRs (fg,bg,labelmap)" )
+parser.add_argument( "--help_all", required=False, help="More in-depth help", action="store_true")
 parser.add_argument( "-f", "--foreground", nargs="+", required=True, help="MR file shown in foreground.", action="append")
 parser.add_argument( "-b", "--background", nargs='*', required=False, help="MR file shown in background.", action="append")
 parser.add_argument( "-l", "--labelmap", nargs='*', required=False, help="MR File of Label map", action="append")

@@ -89,9 +89,12 @@ class MultiCaseWidget:
 #  Main 
 # =======================
 
-# first entry is slite.py
+# if call for help 
+if len(sys.argv) > 1 and sys.argv[1] == "--help_all" : 
+   sys.argv[1] = "-h"
 
 parser = argparse.ArgumentParser( description="A 3D viewer of a single or multiple MRs as defined by <base><case><fg/bg/lm file>" )
+parser.add_argument( "--help_all", required=False, help="More in-depth help", action="store_true")
 parser.add_argument( "-d", "--basePrefix", nargs='+',required=True, help="Base of file name.", action="append")
 parser.add_argument( "-c", "--cases", nargs='+', required=True, help="List of cases to view sequentially.", action="append" )
 parser.add_argument( "-f", "--fgPostfix",  nargs='+', required=True, help="File names of images shown in foreground .", action="append")

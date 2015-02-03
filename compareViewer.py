@@ -2,7 +2,12 @@ import CompareVolumes
 import viewerUtilities
 import argparse
 
+# if call for help 
+if len(sys.argv) > 1 and sys.argv[1] == "--help_all" : 
+   sys.argv[1] = "-h"
+
 parser = argparse.ArgumentParser( description="A 3D viewer of a single or multiple MRs" )
+parser.add_argument( "--help_all", required=False, help="More in-depth help", action="store_true")
 parser.add_argument( "-f", "--foreground",  nargs='+', required=True, help="Images shown in foreground.", action="append")
 parser.add_argument( "-b", "--background",  nargs='*', required=False, help="Images shown in background.", action="append")
 parser.add_argument( "-l", "--labelmap",  nargs='*', required=False, help="File name of Label maps", action="append")
@@ -10,8 +15,11 @@ parser.add_argument( "-4", "--fourD", required=False, help="Load in 4D image seq
 parser.add_argument( "-n", "--window_name", required=False, help="Window name", action="store", default = "Viewer")
 parser.add_argument( "-o", "--orientation", required=False, help="View orientation (Axial, Sagittal, Coronal)", action="store", default = "Axial")
 
+
 args = parser.parse_args()
 fourDFlag=args.fourD
+
+
 
 #
 # Load Volume 
