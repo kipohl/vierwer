@@ -3,6 +3,7 @@ import qt
 import argparse
 import CompareVolumes
 import liteViewer
+import glob
 
 liteViewer.Exit_On_Error_Flag=False
 
@@ -52,8 +53,13 @@ class MultiCaseWidget:
         fileList = []
         if len(postList[vType]):  
           for BASE,FILE in zip(preList,postList[vType]) :
-            fileList.append(BASE + self.activeCase + FILE )
-      
+            fullFile=BASE + self.activeCase + FILE
+            fullFileList = glob.glob(fullFile)
+            if fullFileList :
+               fileList.append(sorted(fullFileList))
+            else: 
+               fileList.append(fullFile)
+
         (nodes,images,missing) = viewerUtilities.loadVolumes(fileList,vType > 1,fourDFlag)
 
         if len(missing) :
