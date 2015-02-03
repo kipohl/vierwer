@@ -30,7 +30,7 @@ class MultiCaseWidget:
     sliceNodeList = self.cvLogic.viewerPerVolume(volumeNodes=self.cpWidget.nodeList[0],background=self.cpWidget.nodeList[1],label=self.cpWidget.nodeList[2],orientation=orientation)
     self.cpWidget.sliceNodeList = sliceNodeList
 
-    self.ctrlWin = self.cpWidget.setup(self.activeCase,"")
+    self.ctrlWin = self.cpWidget.setup(self.activeCase,True,"")
 
     # Add Next button to CTRL Panel  
     self.nextButton = qt.QPushButton("Next")

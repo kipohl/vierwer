@@ -25,7 +25,7 @@ cvLogic=CompareVolumes.CompareVolumesLogic()
 sliceNodeList = cvLogic.viewerPerVolume(volumeNodes=fgNodeList,background=bgNodeList,label=lmNodeList,orientation=args.orientation)
 
 cpWidget=viewerUtilities.CtrlPanelWidget(sliceNodeList,None,fgNodeList,fgImageList,bgNodeList,bgImageList,lmNodeList,lmImageList,args.orientation)
-ctrlWin = cpWidget.setup(args.window_name,"")
+ctrlWin = cpWidget.setup(args.window_name,0,"")
 ctrlWin.show()
 
 #sWidget = slicer.qMRMLSliceWidget()

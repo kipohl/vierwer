@@ -167,7 +167,7 @@ class CtrlPanelWidget:
     self.ctrlWindowSlider = None
     self.styleObserverTags = []
 
-  def setup(self,wName,parent):
+  def setup(self,wName,frameActiveFlag,parent):
     if self.ctrlWidget : 
       return
 
@@ -191,7 +191,7 @@ class CtrlPanelWidget:
     ctrlLayout.addWidget(self.sliderPanel)
     sliderLayout =  self.sliderPanel.layout()
 
-    if self.numFrames > 1:  
+    if self.numFrames > 1 or frameActiveFlag:  
       self.ctrlFrameLabel = qt.QLabel('Frame')
       self.ctrlFrameSlider = ctk.ctkSliderWidget()
       self.ctrlFrameSlider.connect('valueChanged(double)', self.onSliderFrameChanged)

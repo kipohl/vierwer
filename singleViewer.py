@@ -32,7 +32,7 @@ else:
 
 sliceWidget=liteViewer.createViewer("TEST",fgNodeList[0], bgNode, lmNode)
 cpWidget=viewerUtilities.CtrlPanelWidget("",sliceWidget,fgNodeList,fgImageList,bgNodeList,bgImageList,lmNodeList,lmImageList,args.orientation)
-cpWidget.setup(args.window_name,sliceWidget)
+cpWidget.setup(args.window_name,0,sliceWidget)
 ## window does not come up for some reason if we do not do it that way 
 sliceWidget.show()
 
