@@ -38,6 +38,9 @@ class MultiCaseWidget:
     self.nextButton.name = "next case" 
     self.cpWidget.buttonPanel.layout().addWidget(self.nextButton,0,1)
     self.nextButton.connect('clicked()', self.showNext)
+    if len(self.caseList) == 0:
+      self.nextButton.enabled = False
+
 
     self.ctrlWin.show()
 
@@ -82,7 +85,7 @@ class MultiCaseWidget:
     # Load Next 
     self.loadNextCase()
 
-    if len(caseList) == 0:
+    if len(self.caseList) == 0:
       self.nextButton.enabled = False
 
 # =======================

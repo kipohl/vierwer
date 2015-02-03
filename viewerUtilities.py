@@ -170,6 +170,15 @@ class CtrlPanelWidget:
   def setup(self,wName,frameActiveFlag,parent):
     if self.ctrlWidget : 
       return
+    
+    # Hides the module panel so that viewer is of maximum size 
+    # if sliceNodeList is not defined then it is the single viewer which does not have the module panel 
+    if self.sliceNodeList: 
+      modulePanel = slicer.util.findChildren(name='PanelDockWidget')
+      if modulePanel: 
+        modulePanel[0].hide()
+      else : 
+        print "Ignore 'Failed to obtain reference .. '"
 
     self.LinkViewers()
     self.numFrames = len(self.nodeImgList[0][0])
@@ -230,15 +239,17 @@ class CtrlPanelWidget:
 
     self.setOrientation(self.selectedOrientation)
 
-    if False:
+    if True:
       #self.plotFrame = ctk.ctkCollapsibleButton()
       #self.plotFrame.text = "Plotting"
       #self.plotFrame.collapsed = 0
+      # f=ctk.ctkVTKChartView()
+      # f.show()
+
       self.plotFrame=qt.QWidget()
       plotFrameLayout = qt.QGridLayout(self.plotFrame)
       ctrlLayout.addWidget(self.plotFrame)
      
-
       self.plotSettingsFrame = ctk.ctkCollapsibleButton()
       self.plotSettingsFrame.text = "Settings"
       self.plotSettingsFrame.collapsed = 1
@@ -301,7 +312,7 @@ class CtrlPanelWidget:
     sWidgetList = [] 
     if self.sliceNodeList : 
       for snode in self.sliceNodeList.values() :
-        sliceWidget = self.layoutManager.sliceWidget(sNode.GetLayoutName())
+        sliceWidget = self.layoutManager.sliceWidget(snode.GetLayoutName())
         if sliceWidget:
            sWidgetList.append(sliceWidget)
     else:
