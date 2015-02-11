@@ -239,7 +239,7 @@ class CtrlPanelWidget:
 
     self.setOrientation(self.selectedOrientation)
 
-    if True:
+    if False:
       #self.plotFrame = ctk.ctkCollapsibleButton()
       #self.plotFrame.text = "Plotting"
       #self.plotFrame.collapsed = 0

@@ -8,9 +8,9 @@ if len(sys.argv) > 1 and sys.argv[1] == "--help_all" :
 
 parser = argparse.ArgumentParser( description="A 3D viewer of a single or multiple MRs" )
 parser.add_argument( "--help_all", required=False, help="More in-depth help", action="store_true")
-parser.add_argument( "-f", "--foreground",  nargs='+', required=True, help="Images shown in foreground.", action="append")
-parser.add_argument( "-b", "--background",  nargs='*', required=False, help="Images shown in background.", action="append")
-parser.add_argument( "-l", "--labelmap",  nargs='*', required=False, help="File name of Label maps", action="append")
+parser.add_argument( "-f", "--foreground",  nargs='+', required=True, help="File names of images shown in the foreground.", action="append")
+parser.add_argument( "-b", "--background", required=False, help="File name of image shown in the background.", action="append")
+parser.add_argument( "-l", "--labelmap", required=False, help="File name of a single label map")
 parser.add_argument( "-4", "--fourD", required=False, help="Load in 4D image sequence.", action="store_true", default = False )
 parser.add_argument( "-n", "--window_name", required=False, help="Window name", action="store", default = "Viewer")
 parser.add_argument( "-o", "--orientation", required=False, help="View orientation (Axial, Sagittal, Coronal)", action="store", default = "Axial")
@@ -30,7 +30,7 @@ fourDFlag=args.fourD
 
 # https://github.com/pieper/CompareVolumes/blob/master/CompareVolumes.py
 cvLogic=CompareVolumes.CompareVolumesLogic()
-sliceNodeList = cvLogic.viewerPerVolume(volumeNodes=fgNodeList,background=bgNodeList,label=lmNodeList,orientation=args.orientation)
+sliceNodeList = cvLogic.viewerPerVolume(volumeNodes=fgNodeList,background=bgNodeList[0],label=lmNodeList[0],orientation=args.orientation)
 
 cpWidget=viewerUtilities.CtrlPanelWidget(sliceNodeList,None,fgNodeList,fgImageList,bgNodeList,bgImageList,lmNodeList,lmImageList,args.orientation)
 ctrlWin = cpWidget.setup(args.window_name,0,"")
