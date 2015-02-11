@@ -30,7 +30,18 @@ fourDFlag=args.fourD
 
 # https://github.com/pieper/CompareVolumes/blob/master/CompareVolumes.py
 cvLogic=CompareVolumes.CompareVolumesLogic()
-sliceNodeList = cvLogic.viewerPerVolume(volumeNodes=fgNodeList,background=bgNodeList[0],label=lmNodeList[0],orientation=args.orientation)
+if len(bgNodeList) : 
+  bgNode=bgNodeList[0]
+else :
+  bgNode=None
+
+if len(lmNodeList) : 
+  lmNode=lmNodeList[0]
+else :
+  lmNode=None
+
+
+sliceNodeList = cvLogic.viewerPerVolume(volumeNodes=fgNodeList,background=bgNode,label=lmNode,orientation=args.orientation)
 
 cpWidget=viewerUtilities.CtrlPanelWidget(sliceNodeList,None,fgNodeList,fgImageList,bgNodeList,bgImageList,lmNodeList,lmImageList,args.orientation)
 ctrlWin = cpWidget.setup(args.window_name,0,"")
