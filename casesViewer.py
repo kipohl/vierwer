@@ -7,6 +7,7 @@ import glob
 
 liteViewer.Exit_On_Error_Flag=False
 
+
 class MultiCaseWidget:
   def __init__(self,preFileList,cases,postFileList):
     self.preList=preFileList
@@ -19,7 +20,8 @@ class MultiCaseWidget:
     if self.ctrlWin:
        return 
 
-    self.cpWidget=viewerUtilities.CtrlPanelWidget(None,None,None,None,None,None,None,None,orientation)
+    self.cpWidget=viewerUtilities.CtrlPanelWidget(None,None,None,None,None,
+                                                  None,None,None,orientation)
     self.loadNextCase()
     if not self.activeCase :
       liteViewer.errorPrint(0,"Nothing to do!")
@@ -27,7 +29,12 @@ class MultiCaseWidget:
       return       
  
     self.cvLogic=CompareVolumes.CompareVolumesLogic()
-    sliceNodeList = self.cvLogic.viewerPerVolume(volumeNodes=self.cpWidget.nodeList[0],background=self.cpWidget.nodeList[1],label=self.cpWidget.nodeList[2],orientation=orientation)
+    sliceNodeList = self.cvLogic.viewerPerVolume(
+                                        volumeNodes=self.cpWidget.nodeList[0],
+                                        background=self.cpWidget.nodeList[1],
+                                        label=self.cpWidget.nodeList[2],
+                                        orientation=orientation
+                                        )
     self.cpWidget.sliceNodeList = sliceNodeList
 
     self.ctrlWin = self.cpWidget.setup(self.activeCase,True,"")
@@ -63,7 +70,9 @@ class MultiCaseWidget:
             else: 
                fileList.append(fullFile)
 
-        (nodes,images,missing) = viewerUtilities.loadVolumes(fileList,vType > 1,fourDFlag)
+        (nodes,images,missing) = viewerUtilities.loadVolumes(fileList,
+                                                             vType > 1,
+                                                             fourDFlag)
 
         if len(missing) :
            missingList.extend(missing)
@@ -72,7 +81,10 @@ class MultiCaseWidget:
           nodeImgList.append(images)
      
       if len(missingList):
-         liteViewer.errorPrint(1,"Going to next case as the following files could not be loaded for %s: %s" % (self.activeCase, missingList )) 
+         liteViewer.errorPrint(1,
+                               "Going to next case as the following files "
+                               "could not be loaded for %s: %s"
+                               % (self.activeCase, missingList ))
          self.activeCase = None
 
       else:
@@ -96,15 +108,48 @@ class MultiCaseWidget:
 if len(sys.argv) > 1 and sys.argv[1] == "--help_all" : 
    sys.argv[1] = "-h"
 
-parser = argparse.ArgumentParser( description="A 3D viewer of a single or multiple MRs as defined by <base><case><fg/bg/lm file>" )
-parser.add_argument( "--help_all", required=False, help="More in-depth help", action="store_true")
-parser.add_argument( "-d", "--basePrefix", nargs='+',required=True, help="Base of file name.", action="append")
-parser.add_argument( "-c", "--cases", nargs='+', required=True, help="List of cases to view sequentially.", action="append" )
-parser.add_argument( "-f", "--fgPostfix",  nargs='+', required=True, help="File names of images shown in foreground .", action="append")
-parser.add_argument( "-b", "--bgPostfix",  nargs='*', required=False, help="File names of images shown in background.", action="append")
-parser.add_argument( "-l", "--lmPostfix",  nargs='*', required=False, help="File name of Label maps", action="append")
-parser.add_argument( "-4", "--fourD", required=False, help="Load in 4D image sequence.", action="store_true", default = False )
-parser.add_argument( "-o", "--orientation", required=False, help="View orientation (Axial, Sagittal, Coronal)", action="store", default = "Axial")
+parser = argparse.ArgumentParser( description="A 3D viewer of a single or "
+                                              "multiple MRs as defined by "
+                                              "<base><case><fg/bg/lm file>" )
+parser.add_argument( "--help_all",
+                     required=False,
+                     help="More in-depth help",
+                     action="store_true")
+parser.add_argument( "-d", "--basePrefix",
+                     nargs='+',
+                     required=True,
+                     help="Base of file name.",
+                     action="append")
+parser.add_argument( "-c", "--cases",
+                     nargs='+',
+                     required=True,
+                     help="List of cases to view sequentially.",
+                     action="append" )
+parser.add_argument( "-f", "--fgPostfix",
+                     nargs='+',
+                     required=True,
+                     help="File names of images shown in foreground .",
+                     action="append")
+parser.add_argument( "-b", "--bgPostfix",
+                     nargs='*',
+                     required=False,
+                     help="File names of images shown in background.",
+                     action="append")
+parser.add_argument( "-l", "--lmPostfix",
+                     nargs='*',
+                     required=False,
+                     help="File name of Label maps",
+                     action="append")
+parser.add_argument( "-4", "--fourD",
+                     required=False,
+                     help="Load in 4D image sequence.",
+                     action="store_true",
+                     default = False )
+parser.add_argument( "-o", "--orientation",
+                     required=False,
+                     help="View orientation (Axial, Sagittal, Coronal)",
+                     action="store",
+                     default = "Axial")
 
 args = parser.parse_args()
 fourDFlag=args.fourD
