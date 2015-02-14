@@ -22,53 +22,40 @@ To find out more about the different viewer call
     
     a. Look up location of bz2 file on local python
       
-        ```
         BZFILE=`python -c "import bz2; print bz2.__file__"`
-        ```
     
     b. Find where Slicer stores python shared libs
         
-        ```
         cd <path_to>/Slicer-build/Slicer --xterm
         LIBDIR=`dirname $(${PYTHONHOME}/bin/python -c "import  array; print array.__file__")`
         
         # on Mac
         LIBDIR=`dirname $(/Applications/Slicer.app/Contents/bin/SlicerPython -c "import  array; print array.__file__")`
-        ```
         
     c. Copy bz2 into Slicer 
         
-        ```
         cp ${BZFILE} ${LIBDIR}/bz2.so
         # e.g., cp /usr/lib/python2.7/lib-dynload/bz2.x86_64-linux-gnu.so ${DIR}/bz2.so
-        ```
         
     d. Test that it works
         
-        ```
         ${PYTHONHOME}/bin/python -c "import bz2; print bz2.__doc__"
-        ```
 
 3. install nibabel in python
 
     a. Download nibabel 1.3
         
-        ```
         wget https://github.com/nipy/nibabel/archive/1.3.0.tar.gz
         tar -xvzf 1.3.0.tar.gz
-        ```
          
     b. Go to nibabel directory and execute 
   
-        ```
         cd /data/software/nibabel-1.3.0/
         ${PYTHONHOME}/bin/python setup.py install
-        ```
+
     c. Verify nibabel install
         
-        ```
         ${PYTHONHOME}/bin/python -c "import nibabel; print nibabel.__doc__"
-        ```
         
 4. Change slicer path in sviewer.sh 
  
