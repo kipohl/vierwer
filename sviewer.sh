@@ -3,6 +3,7 @@
 # call ./sviewer <TYPE> Options
 # TYPE: lite, single, compare, cases 
 SLICER="/software/Slicer4/releasebuild/Slicer-build/Slicer"
+#SLICER="/Applications/Slicer.app/Contents/MacOS/Slicer"
 CMD="$SLICER --no-splash --disable-scripted-loadable-modules  --disable-cli-modules"
 
 if [ "$1" == "-h" -o "$1" == "--help" ]; then 
