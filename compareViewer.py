@@ -15,11 +15,9 @@ parser.add_argument( "-4", "--fourD", required=False, help="Load in 4D image seq
 parser.add_argument( "-n", "--window_name", required=False, help="Window name", action="store", default = "Viewer")
 parser.add_argument( "-o", "--orientation", required=False, help="View orientation (Axial, Sagittal, Coronal)", action="store", default = "Axial")
 
-
 args = parser.parse_args()
 fourDFlag=args.fourD
-
-
+viewerUtilities.InitialSlicerSetup()
 
 #
 # Load Volume 
@@ -29,7 +27,6 @@ fourDFlag=args.fourD
 (lmNodeList,lmImageList,missingList) = viewerUtilities.loadVolumes(args.labelmap,1,fourDFlag)
 
 # https://github.com/pieper/CompareVolumes/blob/master/CompareVolumes.py
-cvLogic=CompareVolumes.CompareVolumesLogic()
 if len(bgNodeList) : 
   bgNode=bgNodeList[0]
 else :
@@ -40,8 +37,8 @@ if len(lmNodeList) :
 else :
   lmNode=None
 
-
-sliceNodeList = cvLogic.viewerPerVolume(volumeNodes=fgNodeList,background=bgNode,label=lmNode,orientation=args.orientation)
+cvLogic=CompareVolumes.CompareVolumesLogic()
+sliceNodeList = cvLogic.viewerPerVolume(volumeNodes=fgNodeList,background=None,label=lmNode,orientation=args.orientation)
 
 cpWidget=viewerUtilities.CtrlPanelWidget(sliceNodeList,None,fgNodeList,fgImageList,bgNodeList,bgImageList,lmNodeList,lmImageList,args.orientation)
 ctrlWin = cpWidget.setup(args.window_name,0,"")

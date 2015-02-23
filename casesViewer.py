@@ -27,7 +27,7 @@ class MultiCaseWidget:
       return       
  
     self.cvLogic=CompareVolumes.CompareVolumesLogic()
-    sliceNodeList = self.cvLogic.viewerPerVolume(volumeNodes=self.cpWidget.nodeList[0],background=self.cpWidget.nodeList[1],label=self.cpWidget.nodeList[2],orientation=orientation)
+    sliceNodeList = self.cvLogic.viewerPerVolume(volumeNodes=self.cpWidget.nodeList[0],background=None,label=None,orientation=orientation)
     self.cpWidget.sliceNodeList = sliceNodeList
 
     self.ctrlWin = self.cpWidget.setup(self.activeCase,True,"")
@@ -40,7 +40,6 @@ class MultiCaseWidget:
     self.nextButton.connect('clicked()', self.showNext)
     if len(self.caseList) == 0:
       self.nextButton.enabled = False
-
 
     self.ctrlWin.show()
 
@@ -62,7 +61,7 @@ class MultiCaseWidget:
                fileList.append(sorted(fullFileList))
             else: 
                fileList.append(fullFile)
-
+        
         (nodes,images,missing) = viewerUtilities.loadVolumes(fileList,vType > 1,fourDFlag)
 
         if len(missing) :
@@ -99,7 +98,7 @@ if len(sys.argv) > 1 and sys.argv[1] == "--help_all" :
 parser = argparse.ArgumentParser( description="A 3D viewer of a single or multiple MRs as defined by <base><case><fg/bg/lm file>" )
 parser.add_argument( "--help_all", required=False, help="More in-depth help", action="store_true")
 parser.add_argument( "-d", "--basePrefix", nargs='+',required=True, help="Base of file name.", action="append")
-parser.add_argument( "-c", "--cases", nargs='+', required=True, help="List of cases to view sequentially.", action="append" )
+parser.add_argument( "-s", "--cases", nargs='+', required=True, help="List of cases to view sequentially.", action="append" )
 parser.add_argument( "-f", "--fgPostfix",  nargs='+', required=True, help="File names of images shown in foreground .", action="append")
 parser.add_argument( "-b", "--bgPostfix",  nargs='*', required=False, help="File names of images shown in background.", action="append")
 parser.add_argument( "-l", "--lmPostfix",  nargs='*', required=False, help="File name of Label maps", action="append")
@@ -109,37 +108,60 @@ parser.add_argument( "-o", "--orientation", required=False, help="View orientati
 args = parser.parse_args()
 fourDFlag=args.fourD
 
-# remove other viewers
-layoutManager = slicer.app.layoutManager()
-for node in slicer.util.getNodes('vtkMRMLSliceNode*').values():
-     slicer.mrmlScene.RemoveNode(node)
+viewerUtilities.InitialSlicerSetup()
 
 #
 # Load Volume 
 #
 
-# Create Lists
-caseList=[item for sublist in args.cases for item in sublist]
 postList= []
 postList.append([item for sublist in args.fgPostfix for item in sublist])
 
-preList=[item for sublist in args.basePrefix for item in sublist]
+preList=[] 
 # Make same length as fgList 
-if len(preList) == 1 : 
-  base = preList[0]
-  for index in xrange(1,len(postList[0])) : 
-     preList.append(base)
+if len(args.basePrefix) == 1 : 
+  base = args.basePrefix[0]
+  for index in xrange(len(postList[0])) : 
+     preList.extend(base)
+else:
+  preList=[item for sublist in args.basePrefix for item in sublist]
 
+# Create Lists
+tmpCaseList=[item for sublist in args.cases for item in sublist]
+caseList=[]
+for CASE in tmpCaseList :
+   fullCaseList = glob.glob(preList[0] + CASE)
+   if fullCaseList :
+     for dirCase in sorted(fullCaseList):
+        caseList.append(dirCase.replace(preList[0],""))
+
+if not len(caseList):
+   liteViewer.errorPrint(0,"Base path incorrect - none of the cases %s exists in %s !" % (tmpCaseList,preList[0]))
+   sys.exit(1) 
+
+bgList=[] 
 if args.bgPostfix:
-  postList.append([item for sublist in args.bgPostfix for item in sublist])
-else: 
-  postList.append([])
+  if len(args.bgPostfix) == 1 : 
+    bg = args.bgPostfix[0]
+    for index in xrange(len(postList[0])) : 
+      bgList.extend(bg)
 
+  else:
+    bgList = [item for sublist in args.bgPostfix for item in sublist]
+
+postList.append(bgList)
+
+lmList=[] 
 if args.lmPostfix:
-  postList.append([item for sublist in args.lmPostfix for item in sublist])
-else: 
-  postList.append([])
+  if len(args.lmPostfix) == 1 : 
+    lm= args.lmPostfix[0]
+    for index in xrange(len(postList[0])) : 
+      lmList.extend(lm)
 
+  else:
+    lmList = [item for sublist in args.lmPostfix for item in sublist]
+
+postList.append(lmList)
 
 # Setup everything 
 mCaseW = MultiCaseWidget(preList,caseList,postList)

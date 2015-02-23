@@ -8,6 +8,17 @@ from __main__ import qt, ctk, vtk, slicer
 #
 # Functions
 #
+def InitialSlicerSetup(): 
+  # Hides the module panel so that viewer is of maximum size 
+  # if sliceNodeList is not defined then it is the single viewer which does not have the module panel 
+  modulePanel = slicer.util.findChildren(name='PanelDockWidget')
+  if modulePanel: 
+    modulePanel[0].hide()
+
+  # remove other viewers
+  layoutManager = slicer.app.layoutManager()
+  for node in slicer.util.getNodes('vtkMRMLSliceNode*').values():
+     slicer.mrmlScene.RemoveNode(node)
 
 def ReadImageSlicer(FileName): 
   mrml = slicer.vtkMRMLScene()
@@ -134,10 +145,19 @@ def loadVolumes(fileList,labelFlag,fourDFlag):
    if not fileList: 
      return (volNodeList,imgList,missingList)
    
+
    if isinstance(fileList, basestring) :
      fileList = [ fileList ]
-   elif not fourDFlag and (len(fileList) > 1 or not isinstance(fileList[0], basestring)):
-     fileList=[item for sublist in fileList for item in sublist]
+   elif not fourDFlag: 
+     tmpList=[] 
+     for file in fileList :
+       if isinstance(file, basestring) :
+          tmpList.append(file)
+       else:
+          tmpList.extend(file)
+
+     fileList=tmpList 
+     # [item for sublist in fileList for item in sublist]
 
    numVolumes=len(fileList)
    # For multiple input   
@@ -171,16 +191,7 @@ class CtrlPanelWidget:
     if self.ctrlWidget : 
       return
     
-    # Hides the module panel so that viewer is of maximum size 
-    # if sliceNodeList is not defined then it is the single viewer which does not have the module panel 
-    if self.sliceNodeList: 
-      modulePanel = slicer.util.findChildren(name='PanelDockWidget')
-      if modulePanel: 
-        modulePanel[0].hide()
-      else : 
-        print "Ignore 'Failed to obtain reference .. '"
-
-    self.LinkViewers()
+    self.SetLinkViewers(1)
     self.numFrames = len(self.nodeImgList[0][0])
 
     if parent:
@@ -220,7 +231,7 @@ class CtrlPanelWidget:
     sliderLayout.addWidget(self.ctrlWindowLabel, 2, 0)
     sliderLayout.addWidget(self.ctrlWindowSlider, 2, 1)
 
-    self.setSliderRangesAndValues()
+    # self.setSliderRangesAndValues()
 
     if self.sliceNodeList :
       self.orientPanel=qt.QWidget()
@@ -238,6 +249,9 @@ class CtrlPanelWidget:
         index+=1
 
     self.setOrientation(self.selectedOrientation)
+    self.setDisplay()
+    if len(self.nodeList[1]) : 
+        self.SetFGOpacity(0.6)
 
     if False:
       #self.plotFrame = ctk.ctkCollapsibleButton()
@@ -526,12 +540,31 @@ class CtrlPanelWidget:
 
       # self.baselineFrames.maximum = self.numFrames
 
-
-  def LinkViewers(self):
+  def SetLinkViewers(self,flag):
     if self.sliceNodeList:
       sliceNode = self.sliceNodeList.values()[0]
       sliceWidget = self.layoutManager.sliceWidget(sliceNode.GetLayoutName())
-      sliceWidget.sliceController().setSliceLink(1)
+      sliceWidget.sliceController().setSliceLink(flag)
+
+  def SetOutlineLabelMapView(self):
+    if self.sliceNodeList:
+      sliceNode = self.sliceNodeList.values()[0]
+      sliceWidget = self.layoutManager.sliceWidget(sliceNode.GetLayoutName())
+      sliceWidget.sliceController().showLabelOutline(True) 
+
+  def SetFGOpacity(self,val):
+    if self.sliceNodeList:
+      sliceNode = self.sliceNodeList.values()[0]
+      sliceWidget = self.layoutManager.sliceWidget(sliceNode.GetLayoutName())
+      sliceWidget.sliceController().setForegroundOpacity(0.6)
+
+  def SetInterpolationOff(self):
+    if self.sliceNodeList:
+      sliceNode = self.sliceNodeList.values()[0]
+      sliceWidget = self.layoutManager.sliceWidget(sliceNode.GetLayoutName())
+      sliceWidget.sliceController().setForegroundInterpolation(False)
+      sliceWidget.sliceController().setBackgroundInterpolation(False)
+
 
   def onSliderFrameChanged(self,newValue):
     index=int(newValue)
@@ -580,7 +613,57 @@ class CtrlPanelWidget:
           self.ctrlWindowSlider.minimum = iRange[0]
           self.ctrlWindowSlider.maximum = iRange[1]*1.5
           self.ctrlWindowSlider.value=vNode.GetVolumeDisplayNode().GetWindow()
-   
+  
+  def setDisplay(self): 
+    # Set display according to node list
+    if not self.sliceNodeList :
+      return 
+
+    self.SetLinkViewers(0)
+    index = 0 
+    singleBGFlag=(len(self.nodeList[1]) == 1)
+    singleLMFlag=(len(self.nodeList[2]) == 1)
+ 
+    for vName in sorted(self.sliceNodeList.keys()):
+       sNode = self.sliceNodeList[vName]
+       sWidget = self.layoutManager.sliceWidget(sNode.GetLayoutName())
+       sComposite=sWidget.sliceLogic().GetSliceCompositeNode()
+       if self.nodeList[0] and (len(self.nodeList[0]) > index) and self.nodeList[0][index]: 
+          sComposite.SetForegroundVolumeID(self.nodeList[0][index].GetID())
+       else :
+          sComposite.SetForegroundVolumeID("")
+
+       if self.nodeList[1]: 
+          if singleBGFlag:
+             sComposite.SetBackgroundVolumeID(self.nodeList[1][0].GetID())
+          elif  (len(self.nodeList[1]) > index) and self.nodeList[1][index]: 
+             sComposite.SetBackgroundVolumeID(self.nodeList[1][index].GetID())
+          else: 
+             sComposite.SetBackgroundVolumeID("")
+       else :
+          sComposite.SetBackgroundVolumeID("")
+
+       if self.nodeList[2]: 
+          if singleBGFlag:
+             sComposite.SetLabelVolumeID(self.nodeList[2][0].GetID())
+          elif  (len(self.nodeList[2]) > index) and self.nodeList[2][index]: 
+             sComposite.SetLabelVolumeID(self.nodeList[2][index].GetID())
+          else: 
+             sComposite.SetLabelVolumeID("")
+       else :
+          sComposite.SetLabelVolumeID("")
+
+       sWidget.fitSliceToBackground()
+       index += 1
+
+    self.SetLinkViewers(1)
+    self.SetOutlineLabelMapView()
+    self.SetInterpolationOff()
+
+    # update Slider ranges 
+    self.setSliderRangesAndValues()
+
+
   def setNodeListsAndDisplay(self,newNodeList,newNodeImgList,removeFlag):
     if removeFlag:
       for type in xrange(2):
@@ -595,36 +678,8 @@ class CtrlPanelWidget:
     self.nodeList = newNodeList 
     self.nodeImgList=newNodeImgList 
     self.numFrames = len(self.nodeImgList[0][0])
-   
-    # update display 
-    if self.sliceNodeList : 
-      index = 0 
-      for vName in sorted(self.sliceNodeList.keys()):
-        sNode = self.sliceNodeList[vName]
-        sWidget = self.layoutManager.sliceWidget(sNode.GetLayoutName())
-        sComposite=sWidget.sliceLogic().GetSliceCompositeNode()
-        if self.nodeList[0] and (len(self.nodeList[0]) > index) and self.nodeList[0][index]: 
-          sComposite.SetForegroundVolumeID(self.nodeList[0][index].GetID())
-        else :
-          sComposite.SetForegroundVolumeID("")
 
-        if self.nodeList[1] and (len(self.nodeList[1]) > index) and self.nodeList[1][index]: 
-          sComposite.SetBackgroundVolumeID(self.nodeList[1][index].GetID())
-        else :
-          sComposite.SetBackgroundVolumeID("")
-
-        if self.nodeList[2] and (len(self.nodeList[2]) > index) and self.nodeList[2][index]: 
-          sComposite.SetLabelVolumeID(self.nodeList[2][index].GetID())
-        else :
-          sComposite.SetLabelVolumeID("")
-
-        sWidget.fitSliceToBackground()
-        index += 1
-
-
-    # update Slider ranges 
-    self.setSliderRangesAndValues()
-
+    self.setDisplay()     
 
   
 # Debug stuff 
