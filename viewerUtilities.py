@@ -617,6 +617,9 @@ class CtrlPanelWidget:
   def setDisplay(self): 
     # Set display according to node list
     if not self.sliceNodeList :
+      self.SetOutlineLabelMapView()
+      self.SetInterpolationOff()
+      self.setSliderRangesAndValues()
       return 
 
     self.SetLinkViewers(0)
