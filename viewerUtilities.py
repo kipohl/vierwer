@@ -192,7 +192,7 @@ class CtrlPanelWidget:
       return
     
     self.SetLinkViewers(1)
-    self.numFrames = len(self.nodeImgList[0][0])
+    self.numFrames=len(self.nodeImgList[0][0])
 
     if parent:
        self.ctrlWidget = parent
@@ -253,7 +253,7 @@ class CtrlPanelWidget:
     if len(self.nodeList[1]) : 
         self.SetFGOpacity(0.6)
 
-    if False:
+    if True:
       #self.plotFrame = ctk.ctkCollapsibleButton()
       #self.plotFrame.text = "Plotting"
       #self.plotFrame.collapsed = 0
@@ -359,30 +359,25 @@ class CtrlPanelWidget:
     if not self.sliceWidgetsPerStyle.has_key(observee):
       return
 
-    print "update plot"
     sliceWidget = self.sliceWidgetsPerStyle[observee]
     sliceLogic = sliceWidget.sliceLogic()
     interactor = observee.GetInteractor()
     xy = interactor.GetEventPosition()
-    xyz = sliceWidget.sliceView().convertDeviceToXYZ(xy);
 
-    ras = sliceWidget.sliceView().convertXYZToRAS(xyz)
-    # still set bgLayer  
-    bgLayer = sliceLogic.GetForegroundLayer()
-    # GetBackgroundLayer()
-    fgLayer = sliceLogic.GetForegroundLayer()
+    coordinates = []
+    # we need a 4 element point to be able to multiply further down
+    coordinates.append( xy[0] )
+    coordinates.append( xy[1] )
+    coordinates.append( 0 )
+    coordinates.append( 1 )
 
-    volumeNode = fgNodes[0]
-    fgVolumeNode = fgNodes[0]
-    if not volumeNode or volumeNode.GetID() != fgNodes[0].GetID():
-      print "Do nothing"
-      return
-    #if volumeNode != self.__mvNode:
-    #  return
+    xyToRas = sliceLogic.GetSliceNode().GetXYToRAS()
+    rasPos = xyToRas.MultiplyPoint( coordinates )
+    # VTK_CREATE(vtkMatrix4x4, rasToijk);
+    rasToijk=vtk.vtkMatrix4x4()
+    fgNodes[0].GetRASToIJKMatrix(rasToijk)
+    ijkFloat=rasToijk.MultiplyPoint(rasPos)
 
-    nameLabel = volumeNode.GetName()
-    xyToIJK = bgLayer.GetXYToIJKTransform()
-    ijkFloat = xyToIJK.TransformDoublePoint(xyz)
     ijk = []
     for element in ijkFloat:
       try:
@@ -395,28 +390,14 @@ class CtrlPanelWidget:
     if not (ijk[0]>=extent[0] and ijk[0]<=extent[1] and \
        ijk[1]>=extent[2] and ijk[1]<=extent[3] and \
        ijk[2]>=extent[4] and ijk[2]<=extent[5]):
-      print "pixel outside the valid extent"
-
+      
       return
 
-    useFg = False
-    if fgVolumeNode:
-      fgxyToIJK = fgLayer.GetXYToIJKTransform()
-      fgijkFloat = xyToIJK.TransformDoublePoint(xyz)
-      fgijk = []
-      for element in fgijkFloat:
-        try:
-          index = int(round(element))
-        except ValueError:
-          index = 0
-        fgijk.append(index)
-        fgImage = fgVolumeNode.GetImageData()
-
-      fgChartTable = vtk.vtkTable()
-      # Kilian
-      if False and fgijk[0] == ijk[0] and fgijk[1] == ijk[1] and fgijk[2] == ijk[2] and \
-          fgImage.GetNumberOfScalarComponents() == mvImage[0].GetNumberOfScalarComponents():
-        useFg = True
+    nComponents=self.numFrames
+    # for testing 
+    # nComponents=1
+    if True :  
+        fgChartTable = vtk.vtkTable()
 
         fgxArray = vtk.vtkFloatArray()
         fgxArray.SetNumberOfTuples(nComponents)
@@ -440,11 +421,13 @@ class CtrlPanelWidget:
       val = mvImage[c].GetScalarComponentAsDouble(ijk[0],ijk[1],ijk[2],0)
       self.__chartTable.SetValue(c, 0, self.__mvLabels[c])
       self.__chartTable.SetValue(c, 1, val)
-      print (c,val)
-      if useFg:
-        fgValue = fgImage.GetScalarComponentAsDouble(ijk[0],ijk[1],ijk[2],0)
-        fgChartTable.SetValue(c,0,self.__mvLabels[c])
-        fgChartTable.SetValue(c,1,fgValue)
+      if not c: 
+        print val
+
+      #if useFg:
+      #  fgValue = fgImage.GetScalarComponentAsDouble(ijk[0],ijk[1],ijk[2],0)
+      #  fgChartTable.SetValue(c,0,self.__mvLabels[c])
+      #  fgChartTable.SetValue(c,1,fgValue)
  
     baselineAverageSignal = 0
     # if self.iChartingPercent.checked:
@@ -476,6 +459,7 @@ class CtrlPanelWidget:
     #else:
     #  self.__chart.GetAxis(0).SetBehavior(vtk.vtkAxis.AUTO)
     # if useFg:
+    useFg=True
     if useFg:
       plot = self.__chart.AddPlot(vtk.vtkChart.POINTS)
       if vtk.VTK_MAJOR_VERSION <= 5:
