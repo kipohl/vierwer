@@ -14,6 +14,8 @@ parser.add_argument( "-l", "--labelmap", required=False, help="File name of a si
 parser.add_argument( "-4", "--fourD", required=False, help="Load in 4D image sequence.", action="store_true", default = False )
 parser.add_argument( "-n", "--window_name", required=False, help="Window name", action="store", default = "Viewer")
 parser.add_argument( "-o", "--orientation", required=False, help="View orientation (Axial, Sagittal, Coronal)", action="store", default = "Axial")
+parser.add_argument( "-a", "--all_3_orientations", required=False, help="All three view orientations", action="store_true", default = False)
+
 
 args = parser.parse_args()
 fourDFlag=args.fourD
@@ -26,21 +28,23 @@ viewerUtilities.InitialSlicerSetup()
 (bgNodeList,bgImageList,missingList) = viewerUtilities.loadVolumes(args.background,0,fourDFlag)
 (lmNodeList,lmImageList,missingList) = viewerUtilities.loadVolumes(args.labelmap,1,fourDFlag)
 
-# https://github.com/pieper/CompareVolumes/blob/master/CompareVolumes.py
-if len(bgNodeList) : 
-  bgNode=bgNodeList[0]
-else :
-  bgNode=None
-
 if len(lmNodeList) : 
   lmNode=lmNodeList[0]
 else :
   lmNode=None
 
-cvLogic=CompareVolumes.CompareVolumesLogic()
-sliceNodeList = cvLogic.viewerPerVolume(volumeNodes=fgNodeList,background=None,label=lmNode,orientation=args.orientation)
+numCols=len(fgNodeList)
+if args.all_3_orientations : 
+  outline=[3,numCols]
+else : 
+  outline=[1,numCols]
 
-cpWidget=viewerUtilities.CtrlPanelWidget(sliceNodeList,None,fgNodeList,fgImageList,bgNodeList,bgImageList,lmNodeList,lmImageList,args.orientation)
+
+# https://github.com/pieper/CompareVolumes/blob/master/CompareVolumes.py
+cvLogic=CompareVolumes.CompareVolumesLogic()
+sliceNodeList = cvLogic.viewerPerVolume(volumeNodes=fgNodeList,background=None,label=lmNode,layout=outline,orientation=args.orientation)
+
+cpWidget=viewerUtilities.CtrlPanelWidget(sliceNodeList,None,fgNodeList,fgImageList,bgNodeList,bgImageList,lmNodeList,lmImageList,args.orientation,args.all_3_orientations)
 ctrlWin = cpWidget.setup(args.window_name,0,"")
 ctrlWin.show()
 

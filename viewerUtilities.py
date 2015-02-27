@@ -172,7 +172,7 @@ def loadVolumes(fileList,labelFlag,fourDFlag):
    return (volNodeList,imgList,missingList)
 
 class CtrlPanelWidget:
-  def __init__(self,sliceNodes,sliceWidget,fgNodeList,fgNodeImgList,bgNodeList,bgNodeImgList,lmNodeList,lmNodeImgList,orientation):
+  def __init__(self,sliceNodes,sliceWidget,fgNodeList,fgNodeImgList,bgNodeList,bgNodeImgList,lmNodeList,lmNodeImgList,orientation,all_orientations):
     self.sliceNodeList = sliceNodes
     self.singleViewerWidget = sliceWidget   
     self.nodeType = ('FG', 'BG', 'LM')
@@ -180,6 +180,7 @@ class CtrlPanelWidget:
     self.nodeImgList=[fgNodeImgList,bgNodeImgList,lmNodeImgList]
     self.ctrlWidget = None
     self.selectedOrientation = orientation
+    self.allOrientationsFlag=all_orientations
     self.layoutManager = slicer.app.layoutManager()
     self.orientations = ('Axial', 'Sagittal', 'Coronal')
     self.ctrlFrameSlider = None
@@ -244,8 +245,9 @@ class CtrlPanelWidget:
         self.orientationButtons[orientation] = qt.QRadioButton()
         self.orientationButtons[orientation].text = orientation
         # self.orientationBox.layout().addWidget(self.orientationButtons[orientation])
-        self.orientPanel.layout().addWidget(self.orientationButtons[orientation],0,index)
-        self.orientationButtons[orientation].connect("clicked()",lambda o=orientation: self.setOrientation(o))
+        if not self.allOrientationsFlag: 
+          self.orientPanel.layout().addWidget(self.orientationButtons[orientation],0,index)
+          self.orientationButtons[orientation].connect("clicked()",lambda o=orientation: self.setOrientation(o))
         index+=1
 
     self.setOrientation(self.selectedOrientation)
@@ -253,7 +255,17 @@ class CtrlPanelWidget:
     if len(self.nodeList[1]) : 
         self.SetFGOpacity(0.6)
 
-    if True:
+    self.valuePanel=qt.QWidget()
+    self.valuePanel.setLayout(qt.QGridLayout())
+    ctrlLayout.addWidget(self.valuePanel)
+    valueLayout =  self.valuePanel.layout()
+ 
+    self.valueFrameLabel = qt.QLabel('FG:')
+    self.valueFrameValues = qt.QLabel('')
+    valueLayout.addWidget(self.valueFrameLabel, 0, 0)
+    valueLayout.addWidget(self.valueFrameValues, 0, 1)
+  
+    if False:
       #self.plotFrame = ctk.ctkCollapsibleButton()
       #self.plotFrame.text = "Plotting"
       #self.plotFrame.collapsed = 0
@@ -294,7 +306,8 @@ class CtrlPanelWidget:
       self.__chartTable.AddColumn(self.__yArray)
 
       self.onInputChanged()
-      self.refreshObservers()
+      
+    self.refreshObservers()
 
     self.buttonPanel=qt.QWidget()
     self.buttonPanel.setLayout(qt.QGridLayout())
@@ -396,7 +409,7 @@ class CtrlPanelWidget:
     nComponents=self.numFrames
     # for testing 
     # nComponents=1
-    if True :  
+    if False :  
         fgChartTable = vtk.vtkTable()
 
         fgxArray = vtk.vtkFloatArray()
@@ -417,18 +430,45 @@ class CtrlPanelWidget:
         fgChartTable.SetNumberOfRows(nComponents)
 
     # get the vector of values at IJK
-    for c in range(nComponents):
-      val = mvImage[c].GetScalarComponentAsDouble(ijk[0],ijk[1],ijk[2],0)
-      self.__chartTable.SetValue(c, 0, self.__mvLabels[c])
-      self.__chartTable.SetValue(c, 1, val)
-      if not c: 
-        print val
+    if (self.ctrlLevelSlider.maximum - self.ctrlLevelSlider.minimum) > 20 :
+      intFlag=True
+    else :  
+      intFlag=False
+
+    # for c in range(nComponents):
+    disVal = [] 
+    if self.ctrlFrameSlider : 
+      c = int(self.ctrlFrameSlider.value)
+    else :
+      c = 0 
+
+    for img in fgImages : 
+      # for c in range(1):
+      iLen = len(img)
+      if c < iLen :       
+        val = img[c].GetScalarComponentAsDouble(ijk[0],ijk[1],ijk[2],0)
+      else:
+        val = img[iLen-1].GetScalarComponentAsDouble(ijk[0],ijk[1],ijk[2],0)
+
+      if intFlag : 
+          val = int(val)  
+      else :
+          val = round(val*100) / 100.0
+
+      # Kilian : disable later 
+      #self.__chartTable.SetValue(c, 0, self.__mvLabels[c])
+      #self.__chartTable.SetValue(c, 1, val)
+
+      disVal.append(val)
 
       #if useFg:
       #  fgValue = fgImage.GetScalarComponentAsDouble(ijk[0],ijk[1],ijk[2],0)
       #  fgChartTable.SetValue(c,0,self.__mvLabels[c])
       #  fgChartTable.SetValue(c,1,fgValue)
  
+    self.valueFrameValues.setText(disVal)
+    return 
+
     baselineAverageSignal = 0
     # if self.iChartingPercent.checked:
     #   # check if percent plotting was requested and recalculate
@@ -607,14 +647,29 @@ class CtrlPanelWidget:
       return 
 
     self.SetLinkViewers(0)
-    index = 0 
+
     singleBGFlag=(len(self.nodeList[1]) == 1)
     singleLMFlag=(len(self.nodeList[2]) == 1)
- 
+    numColumns=len(self.nodeList[0])
+
+    index = 0  
+    orientIndex=0
+    if (self.allOrientationsFlag) : 
+       orientation = self.orientations[0]
+    else :
+       orientation = self.selectedOrientation
+
     for vName in sorted(self.sliceNodeList.keys()):
+       if (index == numColumns) :
+           index = 0 
+           orientIndex += 1
+           orientation = self.orientations[orientIndex]
+
        sNode = self.sliceNodeList[vName]
        sWidget = self.layoutManager.sliceWidget(sNode.GetLayoutName())
        sComposite=sWidget.sliceLogic().GetSliceCompositeNode()
+       sNode.SetOrientation(orientation) 
+
        if self.nodeList[0] and (len(self.nodeList[0]) > index) and self.nodeList[0][index]: 
           sComposite.SetForegroundVolumeID(self.nodeList[0][index].GetID())
        else :

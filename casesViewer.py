@@ -15,19 +15,25 @@ class MultiCaseWidget:
     self.activeCase=""
     self.ctrlWin="" 
   
-  def setup(self,orientation):
+  def setup(self,orientation,allOrientationFlag):
     if self.ctrlWin:
        return 
 
-    self.cpWidget=viewerUtilities.CtrlPanelWidget(None,None,None,None,None,None,None,None,orientation)
+    self.cpWidget=viewerUtilities.CtrlPanelWidget(None,None,None,None,None,None,None,None,orientation,allOrientationFlag)
     self.loadNextCase()
     if not self.activeCase :
       liteViewer.errorPrint(0,"Nothing to do!")
       exit()
       return       
- 
+
+    numCols=len(self.cpWidget.nodeList[0])
+    if args.all_3_orientations : 
+       outline=[3,numCols]
+    else : 
+       outline=[1,numCols]
+
     self.cvLogic=CompareVolumes.CompareVolumesLogic()
-    sliceNodeList = self.cvLogic.viewerPerVolume(volumeNodes=self.cpWidget.nodeList[0],background=None,label=None,orientation=orientation)
+    sliceNodeList = self.cvLogic.viewerPerVolume(volumeNodes=self.cpWidget.nodeList[0],background=None,label=None,layout=outline,orientation=orientation)
     self.cpWidget.sliceNodeList = sliceNodeList
 
     self.ctrlWin = self.cpWidget.setup(self.activeCase,True,"")
@@ -104,6 +110,7 @@ parser.add_argument( "-b", "--bgPostfix",  nargs='*', required=False, help="File
 parser.add_argument( "-l", "--lmPostfix",  nargs='*', required=False, help="File name of Label maps", action="append")
 parser.add_argument( "-4", "--fourD", required=False, help="Load in 4D image sequence.", action="store_true", default = False )
 parser.add_argument( "-o", "--orientation", required=False, help="View orientation (Axial, Sagittal, Coronal)", action="store", default = "Axial")
+parser.add_argument( "-a", "--all_3_orientations", required=False, help="All three view orientations", action="store_true", default = False)
 
 args = parser.parse_args()
 fourDFlag=args.fourD
@@ -165,7 +172,7 @@ postList.append(lmList)
 
 # Setup everything 
 mCaseW = MultiCaseWidget(preList,caseList,postList)
-mCaseW.setup(args.orientation) 
+mCaseW.setup(args.orientation,args.all_3_orientations) 
 
 # remove viewers of main window
 #layoutManager = slicer.app.layoutManager()
