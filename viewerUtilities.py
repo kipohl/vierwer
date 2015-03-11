@@ -708,7 +708,7 @@ class CtrlPanelWidget:
 
   def setNodeListsAndDisplay(self,newNodeList,newNodeImgList,removeFlag):
     if removeFlag:
-      for type in xrange(2):
+      for type in xrange(3):
         if self.nodeList[type] : 
           for node in self.nodeList[type] :
             dNode=node.GetVolumeDisplayNode()

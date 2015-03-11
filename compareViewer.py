@@ -46,7 +46,18 @@ sliceNodeList = cvLogic.viewerPerVolume(volumeNodes=fgNodeList,background=None,l
 
 cpWidget=viewerUtilities.CtrlPanelWidget(sliceNodeList,None,fgNodeList,fgImageList,bgNodeList,bgImageList,lmNodeList,lmImageList,args.orientation,args.all_3_orientations)
 ctrlWin = cpWidget.setup(args.window_name,0,"")
+
+# For yongs MICCAI paper 
+# Both have to be 4D volumes to correctly work !
+if True:
+  for IND in range(len(fgNodeList)):
+    dn = fgNodeList[IND].GetDisplayNode()
+    dn.SetLowerThreshold(1)
+    dn.ApplyThresholdOn()
+    dn.SetAndObserveColorNodeID('vtkMRMLColorTableNodeFileColdToHotRainbow.txt')
+
 ctrlWin.show()
+
 
 #sWidget = slicer.qMRMLSliceWidget()
 #sWidget.setMRMLScene(slicer.mrmlScene)
