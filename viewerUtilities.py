@@ -580,7 +580,8 @@ class CtrlPanelWidget:
     else :
       sliceWidget = self.singleViewerWidget
 
-    sliceWidget.sliceController().showLabelOutline(True) 
+    if sliceWidget:
+       sliceWidget.sliceController().showLabelOutline(True) 
 
   def SetFGOpacity(self,val):
     if self.sliceNodeList:
@@ -589,7 +590,8 @@ class CtrlPanelWidget:
     else : 
       sliceWidget = self.singleViewerWidget
 
-    sliceWidget.sliceController().setForegroundOpacity(0.6)
+    if sliceWidget: 
+      sliceWidget.sliceController().setForegroundOpacity(0.6)
 
   def SetInterpolationOff(self):
     if self.sliceNodeList:
@@ -598,8 +600,9 @@ class CtrlPanelWidget:
     else : 
       sliceWidget = self.singleViewerWidget
 
-    sliceWidget.sliceController().setForegroundInterpolation(False)
-    sliceWidget.sliceController().setBackgroundInterpolation(False)
+    if sliceWidget: 
+      sliceWidget.sliceController().setForegroundInterpolation(False)
+      sliceWidget.sliceController().setBackgroundInterpolation(False)
 
 
   def onSliderFrameChanged(self,newValue):
