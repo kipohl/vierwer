@@ -60,7 +60,7 @@ class MultiCaseWidget:
       for vType in xrange(3):
         fileList = []
         if len(postList[vType]):  
-          for BASE,FILE in zip(preList,postList[vType]) :
+          for BASE,FILE in zip(preList[vType],postList[vType]) :
             fullFile=BASE + self.activeCase + FILE
             fullFileList = glob.glob(fullFile)
             if fullFileList :
@@ -113,6 +113,7 @@ parser.add_argument( "-o", "--orientation", required=False, help="View orientati
 parser.add_argument( "-a", "--all_3_orientations", required=False, help="All three view orientations", action="store_true", default = False)
 parser.add_argument( "--fg_color_table", required=False, help="Color table for foreground (e.g. vtkMRMLColorTableNodeFileColdToHotRainbow.txt)", action="store")
 parser.add_argument( "--fg_lower_threshold", required=False, help="values below will not be shown in viewer", type=float, default=float('nan'))
+parser.add_argument( "--lmBasePrefix", nargs='+',required=False, help="Base of file name for label map (only define if different from -d).", action="append")
 
 args = parser.parse_args()
 fourDFlag=args.fourD
@@ -127,23 +128,26 @@ postList= []
 postList.append([item for sublist in args.fgPostfix for item in sublist])
 
 preList=[] 
+fgPreList=[] 
 # Make same length as fgList 
 if len(args.basePrefix) == 1 : 
   base = args.basePrefix[0]
   for index in xrange(len(postList[0])) : 
-     preList.extend(base)
+     fgPreList.extend(base)
 else:
-  preList=[item for sublist in args.basePrefix for item in sublist]
+  fgPreList=[item for sublist in args.basePrefix for item in sublist]
+
+preList.append(fgPreList) 
 
 # Create Lists
 tmpCaseList=[item for sublist in args.cases for item in sublist]
 caseList=[]
 for CASE in tmpCaseList :
    if '*' in CASE or '?' in CASE :  
-     fullCaseList = glob.glob(preList[0] + CASE)
+     fullCaseList = glob.glob(fgPreList[0] + CASE)
      if fullCaseList :
        for dirCase in sorted(fullCaseList):
-         caseList.append(dirCase.replace(preList[0],""))
+         caseList.append(dirCase.replace(fgPreList[0],""))
    else :
        caseList.append(CASE)
 
@@ -163,6 +167,9 @@ if args.bgPostfix:
 
 postList.append(bgList)
 
+# currently not explicitly defined 
+preList.append(fgPreList) 
+
 lmList=[] 
 if args.lmPostfix:
   if len(args.lmPostfix) == 1 : 
@@ -174,6 +181,20 @@ if args.lmPostfix:
     lmList = [item for sublist in args.lmPostfix for item in sublist]
 
 postList.append(lmList)
+
+if len(args.lmBasePrefix) == 0 :
+  lmPreList = preList
+else : 
+  lmPreList=[] 
+  if len(args.lmBasePrefix) == 1 : 
+    base = args.lmBasePrefix[0]
+    for index in xrange(len(postList[2])) : 
+      lmPreList.extend(base)
+  else:
+    lmPreList=[item for sublist in args.lmBasePrefix for item in sublist]
+
+preList.append(lmPreList) 
+
 
 # Setup everything 
 mCaseW = MultiCaseWidget(preList,caseList,postList)
