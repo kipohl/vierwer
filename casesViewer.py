@@ -139,13 +139,16 @@ else:
 tmpCaseList=[item for sublist in args.cases for item in sublist]
 caseList=[]
 for CASE in tmpCaseList :
-   fullCaseList = glob.glob(preList[0] + CASE)
-   if fullCaseList :
-     for dirCase in sorted(fullCaseList):
-        caseList.append(dirCase.replace(preList[0],""))
+   if '*' in CASE or '?' in CASE :  
+     fullCaseList = glob.glob(preList[0] + CASE)
+     if fullCaseList :
+       for dirCase in sorted(fullCaseList):
+         caseList.append(dirCase.replace(preList[0],""))
+   else :
+       caseList.append(CASE)
 
 if not len(caseList):
-   liteViewer.errorPrint(0,"Base path incorrect - none of the cases %s exists in %s !" % (tmpCaseList,preList[0]))
+   liteViewer.errorPrint(0,"Base path seems to be incorrect - none of the cases %s exists in %s !" % (tmpCaseList,preList[0]))
    sys.exit(1) 
 
 bgList=[] 
