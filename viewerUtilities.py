@@ -577,20 +577,29 @@ class CtrlPanelWidget:
     if self.sliceNodeList:
       sliceNode = self.sliceNodeList.values()[0]
       sliceWidget = self.layoutManager.sliceWidget(sliceNode.GetLayoutName())
-      sliceWidget.sliceController().showLabelOutline(True) 
+    else :
+      sliceWidget = self.singleViewerWidget
+
+    sliceWidget.sliceController().showLabelOutline(True) 
 
   def SetFGOpacity(self,val):
     if self.sliceNodeList:
       sliceNode = self.sliceNodeList.values()[0]
       sliceWidget = self.layoutManager.sliceWidget(sliceNode.GetLayoutName())
-      sliceWidget.sliceController().setForegroundOpacity(0.6)
+    else : 
+      sliceWidget = self.singleViewerWidget
+
+    sliceWidget.sliceController().setForegroundOpacity(0.6)
 
   def SetInterpolationOff(self):
     if self.sliceNodeList:
       sliceNode = self.sliceNodeList.values()[0]
       sliceWidget = self.layoutManager.sliceWidget(sliceNode.GetLayoutName())
-      sliceWidget.sliceController().setForegroundInterpolation(False)
-      sliceWidget.sliceController().setBackgroundInterpolation(False)
+    else : 
+      sliceWidget = self.singleViewerWidget
+
+    sliceWidget.sliceController().setForegroundInterpolation(False)
+    sliceWidget.sliceController().setBackgroundInterpolation(False)
 
 
   def onSliderFrameChanged(self,newValue):
@@ -643,65 +652,64 @@ class CtrlPanelWidget:
   
   def setDisplay(self): 
     # Set display according to node list
-    if not self.sliceNodeList :
-      self.SetOutlineLabelMapView()
-      self.SetInterpolationOff()
-      self.setSliderRangesAndValues()
-      return 
+    # i.e. CompareViewer specific setting
 
-    self.SetLinkViewers(0)
+    if self.sliceNodeList :
+      self.SetLinkViewers(0)
 
-    singleBGFlag=(len(self.nodeList[1]) == 1)
-    singleLMFlag=(len(self.nodeList[2]) == 1)
-    numColumns=len(self.nodeList[0])
+      singleBGFlag=(len(self.nodeList[1]) == 1)
+      singleLMFlag=(len(self.nodeList[2]) == 1)
+      numColumns=len(self.nodeList[0])
+      
+      index = 0  
+      orientIndex=0
+      if (self.allOrientationsFlag) : 
+         orientation = self.orientations[0]
+      else :
+         orientation = self.selectedOrientation
+      
+      for vName in sorted(self.sliceNodeList.keys()):
+         if (index == numColumns) :
+             index = 0 
+             orientIndex += 1
+             orientation = self.orientations[orientIndex]
+      
+         sNode = self.sliceNodeList[vName]
+         sWidget = self.layoutManager.sliceWidget(sNode.GetLayoutName())
+         sComposite=sWidget.sliceLogic().GetSliceCompositeNode()
+         sNode.SetOrientation(orientation) 
+      
+         if self.nodeList[0] and (len(self.nodeList[0]) > index) and self.nodeList[0][index]: 
+            sComposite.SetForegroundVolumeID(self.nodeList[0][index].GetID())
+         else :
+            sComposite.SetForegroundVolumeID("")
+      
+         if self.nodeList[1]: 
+            if singleBGFlag:
+               sComposite.SetBackgroundVolumeID(self.nodeList[1][0].GetID())
+            elif  (len(self.nodeList[1]) > index) and self.nodeList[1][index]: 
+               sComposite.SetBackgroundVolumeID(self.nodeList[1][index].GetID())
+            else: 
+               sComposite.SetBackgroundVolumeID("")
+         else :
+            sComposite.SetBackgroundVolumeID("")
+      
+         if self.nodeList[2]: 
+            if singleBGFlag:
+               sComposite.SetLabelVolumeID(self.nodeList[2][0].GetID())
+            elif  (len(self.nodeList[2]) > index) and self.nodeList[2][index]: 
+               sComposite.SetLabelVolumeID(self.nodeList[2][index].GetID())
+            else: 
+               sComposite.SetLabelVolumeID("")
+         else :
+            sComposite.SetLabelVolumeID("")
+      
+         sWidget.fitSliceToBackground()
+         index += 1
+      
+      self.SetLinkViewers(1)
+      # End of CompareViewer specific setting
 
-    index = 0  
-    orientIndex=0
-    if (self.allOrientationsFlag) : 
-       orientation = self.orientations[0]
-    else :
-       orientation = self.selectedOrientation
-
-    for vName in sorted(self.sliceNodeList.keys()):
-       if (index == numColumns) :
-           index = 0 
-           orientIndex += 1
-           orientation = self.orientations[orientIndex]
-
-       sNode = self.sliceNodeList[vName]
-       sWidget = self.layoutManager.sliceWidget(sNode.GetLayoutName())
-       sComposite=sWidget.sliceLogic().GetSliceCompositeNode()
-       sNode.SetOrientation(orientation) 
-
-       if self.nodeList[0] and (len(self.nodeList[0]) > index) and self.nodeList[0][index]: 
-          sComposite.SetForegroundVolumeID(self.nodeList[0][index].GetID())
-       else :
-          sComposite.SetForegroundVolumeID("")
-
-       if self.nodeList[1]: 
-          if singleBGFlag:
-             sComposite.SetBackgroundVolumeID(self.nodeList[1][0].GetID())
-          elif  (len(self.nodeList[1]) > index) and self.nodeList[1][index]: 
-             sComposite.SetBackgroundVolumeID(self.nodeList[1][index].GetID())
-          else: 
-             sComposite.SetBackgroundVolumeID("")
-       else :
-          sComposite.SetBackgroundVolumeID("")
-
-       if self.nodeList[2]: 
-          if singleBGFlag:
-             sComposite.SetLabelVolumeID(self.nodeList[2][0].GetID())
-          elif  (len(self.nodeList[2]) > index) and self.nodeList[2][index]: 
-             sComposite.SetLabelVolumeID(self.nodeList[2][index].GetID())
-          else: 
-             sComposite.SetLabelVolumeID("")
-       else :
-          sComposite.SetLabelVolumeID("")
-
-       sWidget.fitSliceToBackground()
-       index += 1
-
-    self.SetLinkViewers(1)
     self.SetOutlineLabelMapView()
     self.SetInterpolationOff()
 
@@ -717,10 +725,6 @@ class CtrlPanelWidget:
 
     # update Slider ranges 
     self.setSliderRangesAndValues()
-
-   
-
- 
 
 
   def setNodeListsAndDisplay(self,newNodeList,newNodeImgList,removeFlag):

@@ -38,6 +38,7 @@ else:
      lmNode= None
 
 sliceWidget=liteViewer.createViewer("TEST",fgNodeList[0], bgNode, lmNode)
+sliceWidget.fitSliceToBackground()
 cpWidget=viewerUtilities.CtrlPanelWidget("",sliceWidget,fgNodeList,fgImageList,bgNodeList,bgImageList,lmNodeList,lmImageList,args.orientation,False, args.fg_color_table, args.fg_lower_threshold)
 cpWidget.setup(args.window_name,0,sliceWidget)
 ## window does not come up for some reason if we do not do it that way 
