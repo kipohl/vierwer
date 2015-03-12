@@ -19,7 +19,7 @@ class MultiCaseWidget:
     if self.ctrlWin:
        return 
 
-    self.cpWidget=viewerUtilities.CtrlPanelWidget(None,None,None,None,None,None,None,None,orientation,allOrientationFlag)
+    self.cpWidget=viewerUtilities.CtrlPanelWidget(None,None,None,None,None,None,None,None,orientation,allOrientationFlag,args.fg_color_table, args.fg_lower_threshold)
     self.loadNextCase()
     if not self.activeCase :
       liteViewer.errorPrint(0,"Nothing to do!")
@@ -111,6 +111,8 @@ parser.add_argument( "-l", "--lmPostfix",  nargs='*', required=False, help="File
 parser.add_argument( "-4", "--fourD", required=False, help="Load in 4D image sequence.", action="store_true", default = False )
 parser.add_argument( "-o", "--orientation", required=False, help="View orientation (Axial, Sagittal, Coronal)", action="store", default = "Axial")
 parser.add_argument( "-a", "--all_3_orientations", required=False, help="All three view orientations", action="store_true", default = False)
+parser.add_argument( "--fg_color_table", required=False, help="Color table for foreground (e.g. vtkMRMLColorTableNodeFileColdToHotRainbow.txt)", action="store")
+parser.add_argument( "--fg_lower_threshold", required=False, help="values below will not be shown in viewer", type=float, default=float('nan'))
 
 args = parser.parse_args()
 fourDFlag=args.fourD

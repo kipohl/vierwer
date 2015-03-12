@@ -3,6 +3,7 @@ import os
 import vtk.util.numpy_support
 import nibabel as nib
 import liteViewer
+import math
 from __main__ import qt, ctk, vtk, slicer
 
 #
@@ -172,7 +173,7 @@ def loadVolumes(fileList,labelFlag,fourDFlag):
    return (volNodeList,imgList,missingList)
 
 class CtrlPanelWidget:
-  def __init__(self,sliceNodes,sliceWidget,fgNodeList,fgNodeImgList,bgNodeList,bgNodeImgList,lmNodeList,lmNodeImgList,orientation,all_orientations):
+  def __init__(self,sliceNodes,sliceWidget,fgNodeList,fgNodeImgList,bgNodeList,bgNodeImgList,lmNodeList,lmNodeImgList,orientation,all_orientations,fg_Color_Table,fg_Lower_Threshold):
     self.sliceNodeList = sliceNodes
     self.singleViewerWidget = sliceWidget   
     self.nodeType = ('FG', 'BG', 'LM')
@@ -181,6 +182,8 @@ class CtrlPanelWidget:
     self.ctrlWidget = None
     self.selectedOrientation = orientation
     self.allOrientationsFlag=all_orientations
+    self.fgColorTable = fg_Color_Table
+    self.fgLowerThreshold = fg_Lower_Threshold
     self.layoutManager = slicer.app.layoutManager()
     self.orientations = ('Axial', 'Sagittal', 'Coronal')
     self.ctrlFrameSlider = None
@@ -702,8 +705,22 @@ class CtrlPanelWidget:
     self.SetOutlineLabelMapView()
     self.SetInterpolationOff()
 
+    # only execute if variabels are set 
+    for IND in range(len(self.nodeList[0])):
+       dn = self.nodeList[0][IND].GetDisplayNode()
+       if not math.isnan(self.fgLowerThreshold) : 
+         dn.SetLowerThreshold(self.fgLowerThreshold)
+         dn.ApplyThresholdOn()
+
+       if self.fgColorTable : 
+         dn.SetAndObserveColorNodeID(self.fgColorTable)
+
     # update Slider ranges 
     self.setSliderRangesAndValues()
+
+   
+
+ 
 
 
   def setNodeListsAndDisplay(self,newNodeList,newNodeImgList,removeFlag):

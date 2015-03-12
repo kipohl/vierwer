@@ -14,6 +14,8 @@ parser.add_argument( "-l", "--labelmap", nargs='*', required=False, help="MR Fil
 parser.add_argument( "-4", "--fourD", required=False, help="Load in 4D image sequence.", action="store_true", default = False )
 parser.add_argument( "-n", "--window_name", required=False, help="Window name", action="store", default = "Viewer")
 parser.add_argument( "-o", "--orientation", required=False, help="View orientation (Axial, Sagittal, Coronal)", action="store", default = "Axial")
+parser.add_argument( "--fg_color_table", required=False, help="Color table for foreground (e.g. vtkMRMLColorTableNodeFileColdToHotRainbow.txt)", action="store")
+parser.add_argument( "--fg_lower_threshold", required=False, help="values below will not be shown in viewer", type=float, default=float('nan'))
 
 args = parser.parse_args()
 fourDFlag=args.fourD
@@ -36,7 +38,7 @@ else:
      lmNode= None
 
 sliceWidget=liteViewer.createViewer("TEST",fgNodeList[0], bgNode, lmNode)
-cpWidget=viewerUtilities.CtrlPanelWidget("",sliceWidget,fgNodeList,fgImageList,bgNodeList,bgImageList,lmNodeList,lmImageList,args.orientation,False)
+cpWidget=viewerUtilities.CtrlPanelWidget("",sliceWidget,fgNodeList,fgImageList,bgNodeList,bgImageList,lmNodeList,lmImageList,args.orientation,False, args.fg_color_table, args.fg_lower_threshold)
 cpWidget.setup(args.window_name,0,sliceWidget)
 ## window does not come up for some reason if we do not do it that way 
 sliceWidget.show()

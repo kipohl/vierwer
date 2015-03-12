@@ -15,6 +15,8 @@ parser.add_argument( "-4", "--fourD", required=False, help="Load in 4D image seq
 parser.add_argument( "-n", "--window_name", required=False, help="Window name", action="store", default = "Viewer")
 parser.add_argument( "-o", "--orientation", required=False, help="View orientation (Axial, Sagittal, Coronal)", action="store", default = "Axial")
 parser.add_argument( "-a", "--all_3_orientations", required=False, help="All three view orientations", action="store_true", default = False)
+parser.add_argument( "--fg_color_table", required=False, help="Color table for foreground (e.g. vtkMRMLColorTableNodeFileColdToHotRainbow.txt)", action="store")
+parser.add_argument( "--fg_lower_threshold", required=False, help="values below will not be shown in viewer", type=float, default=float('nan'))
 
 
 args = parser.parse_args()
@@ -44,17 +46,8 @@ else :
 cvLogic=CompareVolumes.CompareVolumesLogic()
 sliceNodeList = cvLogic.viewerPerVolume(volumeNodes=fgNodeList,background=None,label=lmNode,layout=outline,orientation=args.orientation)
 
-cpWidget=viewerUtilities.CtrlPanelWidget(sliceNodeList,None,fgNodeList,fgImageList,bgNodeList,bgImageList,lmNodeList,lmImageList,args.orientation,args.all_3_orientations)
+cpWidget=viewerUtilities.CtrlPanelWidget(sliceNodeList,None,fgNodeList,fgImageList,bgNodeList,bgImageList,lmNodeList,lmImageList,args.orientation,args.all_3_orientations, args.fg_color_table, args.fg_lower_threshold)
 ctrlWin = cpWidget.setup(args.window_name,0,"")
-
-# For yongs MICCAI paper 
-# Both have to be 4D volumes to correctly work !
-if True:
-  for IND in range(len(fgNodeList)):
-    dn = fgNodeList[IND].GetDisplayNode()
-    dn.SetLowerThreshold(1)
-    dn.ApplyThresholdOn()
-    dn.SetAndObserveColorNodeID('vtkMRMLColorTableNodeFileColdToHotRainbow.txt')
 
 ctrlWin.show()
 
