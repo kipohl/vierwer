@@ -182,7 +182,7 @@ if args.lmPostfix:
 
 postList.append(lmList)
 
-if len(args.lmBasePrefix) == 0 :
+if not args.lmBasePrefix or len(args.lmBasePrefix) == 0 :
   lmPreList = preList
 else : 
   lmPreList=[] 
