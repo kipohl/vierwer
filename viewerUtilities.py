@@ -268,22 +268,23 @@ class CtrlPanelWidget:
     valueLayout.addWidget(self.valueFrameLabel, 0, 0)
     valueLayout.addWidget(self.valueFrameValues, 0, 1)
   
-    if False:
-      #self.plotFrame = ctk.ctkCollapsibleButton()
-      #self.plotFrame.text = "Plotting"
-      #self.plotFrame.collapsed = 0
+    if True:
+      # self.plotFrame = ctk.ctkCollapsibleButton()
+      # self.plotFrame.text = "Plotting"
+      # self.plotFrame.collapsed = 0
       # f=ctk.ctkVTKChartView()
       # f.show()
 
       self.plotFrame=qt.QWidget()
+      # self.plotFrame.resize(self.plotFrame.width,400)
       plotFrameLayout = qt.QGridLayout(self.plotFrame)
       ctrlLayout.addWidget(self.plotFrame)
-     
+
       self.plotSettingsFrame = ctk.ctkCollapsibleButton()
       self.plotSettingsFrame.text = "Settings"
       self.plotSettingsFrame.collapsed = 1
       plotSettingsFrameLayout = qt.QGridLayout(self.plotSettingsFrame)
-      #plotFrameLayout.addWidget(self.plotSettingsFrame,0,1)
+      # plotFrameLayout.addWidget(self.plotSettingsFrame,0,1)
 
       self.xLogScaleCheckBox = qt.QCheckBox()
       self.xLogScaleCheckBox.setChecked(0)
@@ -294,8 +295,6 @@ class CtrlPanelWidget:
 
       # taken from  https://github.com/fedorov/MultiVolumeExplorer
       self.__chartView = ctk.ctkVTKChartView(self.ctrlWidget) 
-      # self.plotFrame)
-      #  self.ctrlWidget 
       plotFrameLayout.addWidget(self.__chartView,0,0)
 
       self.__chart = self.__chartView.chart()
@@ -303,13 +302,13 @@ class CtrlPanelWidget:
       self.__xArray = vtk.vtkFloatArray()
       self.__yArray = vtk.vtkFloatArray()
       # will crash if there is no name
-      self.__xArray.SetName('')
-      self.__yArray.SetName('signal intensity')
+      self.__xArray.SetName('Time1')
+      self.__yArray.SetName('Intensity1')
       self.__chartTable.AddColumn(self.__xArray)
       self.__chartTable.AddColumn(self.__yArray)
 
       self.onInputChanged()
-      
+
     self.refreshObservers()
 
     self.buttonPanel=qt.QWidget()
@@ -412,9 +411,7 @@ class CtrlPanelWidget:
     nComponents=self.numFrames
     # for testing 
     # nComponents=1
-    if False :  
-        fgChartTable = vtk.vtkTable()
-
+    if True :  
         fgxArray = vtk.vtkFloatArray()
         fgxArray.SetNumberOfTuples(nComponents)
         fgxArray.SetNumberOfComponents(1)
@@ -428,6 +425,7 @@ class CtrlPanelWidget:
         fgyArray.SetName('signal intensity')
  
         # will crash if there is no name
+        fgChartTable = vtk.vtkTable()
         fgChartTable.AddColumn(fgxArray)
         fgChartTable.AddColumn(fgyArray)
         fgChartTable.SetNumberOfRows(nComponents)
@@ -438,31 +436,33 @@ class CtrlPanelWidget:
     else :  
       intFlag=False
 
-    # for c in range(nComponents):
     disVal = [] 
     if self.ctrlFrameSlider : 
-      c = int(self.ctrlFrameSlider.value)
+      cInd = int(self.ctrlFrameSlider.value)
     else :
-      c = 0 
+      cInd = 0 
 
-    for img in fgImages : 
-      # for c in range(1):
-      iLen = len(img)
-      if c < iLen :       
-        val = img[c].GetScalarComponentAsDouble(ijk[0],ijk[1],ijk[2],0)
-      else:
-        val = img[iLen-1].GetScalarComponentAsDouble(ijk[0],ijk[1],ijk[2],0)
+    for c in range(nComponents):
 
-      if intFlag : 
-          val = int(val)  
-      else :
-          val = round(val*100) / 100.0
-
-      # Kilian : disable later 
-      #self.__chartTable.SetValue(c, 0, self.__mvLabels[c])
-      #self.__chartTable.SetValue(c, 1, val)
-
-      disVal.append(val)
+      for img in fgImages : 
+        # for c in range(1):
+        iLen = len(img)
+        if c < iLen :       
+          val = img[c].GetScalarComponentAsDouble(ijk[0],ijk[1],ijk[2],0)
+        else:
+          val = img[iLen-1].GetScalarComponentAsDouble(ijk[0],ijk[1],ijk[2],0)
+        
+        if intFlag : 
+            val = int(val)  
+        else :
+            val = round(val*100) / 100.0
+        
+        # Kilian:  will only show last image - change later 
+        self.__chartTable.SetValue(c, 0, self.__mvLabels[c])
+        self.__chartTable.SetValue(c, 1, val)
+        
+        if cInd == c : 
+           disVal.append(val)
 
       #if useFg:
       #  fgValue = fgImage.GetScalarComponentAsDouble(ijk[0],ijk[1],ijk[2],0)
@@ -470,7 +470,9 @@ class CtrlPanelWidget:
       #  fgChartTable.SetValue(c,1,fgValue)
  
     self.valueFrameValues.setText(disVal)
-    return 
+
+    # To disable plot uncomment
+    # return 
 
     baselineAverageSignal = 0
     # if self.iChartingPercent.checked:
@@ -495,14 +497,20 @@ class CtrlPanelWidget:
     #tag = str(self.__mvNode.GetAttribute('MultiVolume.FrameIdentifyingDICOMTagName'))
     #units = str(self.__mvNode.GetAttribute('MultiVolume.FrameIdentifyingDICOMTagUnits'))
     #xTitle = tag+', '+units
-    self.__chart.GetAxis(1).SetTitle("Hello")
+    self.__chart.GetAxis(1).SetTitle("Time")
     #if self.iChartingIntensityFixedAxes.checked == True:
-    self.__chart.GetAxis(0).SetBehavior(vtk.vtkAxis.FIXED)
-    self.__chart.GetAxis(0).SetRange(self.__mvRange[0],self.__mvRange[1])
+    
+    # self.__chart.GetAxis(0).SetBehavior(vtk.vtkAxis.FIXED)
+    # self.__chart.GetAxis(0).SetRange(self.__mvRange[0],self.__mvRange[1])
+    # self.__chart.GetAxis(0).SetRange(2000,6000)
+
+    # self.__chart.GetAxis(1).SetBehavior(vtk.vtkAxis.FIXED)
+    # self.__chart.GetAxis(1).SetRange(2000,6000)
+
     #else:
     #  self.__chart.GetAxis(0).SetBehavior(vtk.vtkAxis.AUTO)
     # if useFg:
-    useFg=True
+    useFg=False
     if useFg:
       plot = self.__chart.AddPlot(vtk.vtkChart.POINTS)
       if vtk.VTK_MAJOR_VERSION <= 5:
@@ -539,11 +547,11 @@ class CtrlPanelWidget:
       self.__xArray.SetNumberOfTuples(self.numFrames)
       self.__xArray.SetNumberOfComponents(1)
       self.__xArray.Allocate(self.numFrames)
-      self.__xArray.SetName('frame')
+      self.__xArray.SetName('Time')
       self.__yArray.SetNumberOfTuples(self.numFrames)
       self.__yArray.SetNumberOfComponents(1)
       self.__yArray.Allocate(self.numFrames)
-      self.__yArray.SetName('signal intensity')
+      self.__yArray.SetName('Intensity')
 
       self.__chartTable = vtk.vtkTable()
       self.__chartTable.AddColumn(self.__xArray)
